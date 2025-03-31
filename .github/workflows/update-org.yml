@@ -1,0 +1,21 @@
+name: Update GitHub Org
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  apply-config:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - name: Build CLI
+        run: cargo build --release
+      - name: Apply Config
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+        run: ./target/release/gh-config-cli --config repos.yaml --token $GITHUB_TOKEN
