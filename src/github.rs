@@ -1,8 +1,8 @@
 use crate::config::{Assignment, Repo, RepoSettings, Team, User};
 use crate::error::{AppError, AppResult};
-use log::{debug, info};
+use log::{debug, info, error};
 use reqwest::Client;
-use serde::Deserialize; // Removed Serialize
+use serde::Deserialize;
 use serde_json::json;
 
 #[derive(Debug, Deserialize)]
@@ -63,7 +63,10 @@ impl GitHubClient {
         if response.status().is_success() {
             Ok(())
         } else {
-            Err(AppError::GitHubApi(response.text().await?))
+            let status = response.status();
+            let text = response.text().await?;
+            error!("PATCH {} failed with status {}: {}", url, status, text);
+            Err(AppError::GitHubApi(text))
         }
     }
 
@@ -80,7 +83,10 @@ impl GitHubClient {
         if response.status().is_success() {
             Ok(())
         } else {
-            Err(AppError::GitHubApi(response.text().await?))
+            let status = response.status();
+            let text = response.text().await?;
+            error!("POST {} failed with status {}: {}", url, status, text);
+            Err(AppError::GitHubApi(text))
         }
     }
 
@@ -98,7 +104,10 @@ impl GitHubClient {
         if response.status().is_success() {
             Ok(())
         } else {
-            Err(AppError::GitHubApi(response.text().await?))
+            let status = response.status();
+            let text = response.text().await?;
+            error!("PUT {} failed with status {}: {}", url, status, text);
+            Err(AppError::GitHubApi(text))
         }
     }
 
@@ -111,17 +120,27 @@ impl GitHubClient {
             .header("User-Agent", "gh-config-cli")
             .send()
             .await?;
-        if response.status().is_success() {
+        let status = response.status();
+        debug!("GET {} returned status: {}", url, status);
+        if status.is_success() {
             Ok(response)
         } else {
-            Err(AppError::GitHubApi(response.text().await?))
+            let text = response.text().await?;
+            error!("GET {} failed with status {}: {}", url, status, text);
+            Err(AppError::GitHubApi(text))
         }
     }
 
     async fn get_repo_settings(&self, repo_name: &str) -> AppResult<RepoSettings> {
         let url = format!("https://api.github.com/repos/{}/{}", self.org, repo_name);
         let response = self.get(&url).await?;
-        let repo: RepoResponse = response.json().await?;
+        let text = response.text().await?;
+        if text.is_empty() {
+            error!("Empty response body from GET {}", url);
+            return Err(AppError::GitHubApi("Empty response body".to_string()));
+        }
+        let repo: RepoResponse = serde_json::from_str(&text)
+            .map_err(|e| AppError::GitHubApi(format!("Failed to parse response from {}: {}", url, e)))?;
         Ok(RepoSettings {
             allow_merge_commit: repo.allow_merge_commit,
             allow_squash_merge: repo.allow_squash_merge,
@@ -132,7 +151,13 @@ impl GitHubClient {
     async fn get_repo_visibility(&self, repo_name: &str) -> AppResult<String> {
         let url = format!("https://api.github.com/repos/{}/{}", self.org, repo_name);
         let response = self.get(&url).await?;
-        let repo: RepoResponse = response.json().await?;
+        let text = response.text().await?;
+        if text.is_empty() {
+            error!("Empty response body from GET {}", url);
+            return Err(AppError::GitHubApi("Empty response body".to_string()));
+        }
+        let repo: RepoResponse = serde_json::from_str(&text)
+            .map_err(|e| AppError::GitHubApi(format!("Failed to parse response from {}: {}", url, e)))?;
         Ok(if repo.private { "private" } else { "public" }.to_string())
     }
 
@@ -140,8 +165,14 @@ impl GitHubClient {
         let url = format!("https://api.github.com/orgs/{}/teams/{}", self.org, team_name);
         match self.get(&url).await {
             Ok(response) => {
-                let team: TeamResponse = response.json().await?;
-                if team.name == team_name { // Use the name field to confirm
+                let text = response.text().await?;
+                if text.is_empty() {
+                    error!("Empty response body from GET {}", url);
+                    return Err(AppError::GitHubApi("Empty response body".to_string()));
+                }
+                let team: TeamResponse = serde_json::from_str(&text)
+                    .map_err(|e| AppError::GitHubApi(format!("Failed to parse response from {}: {}", url, e)))?;
+                if team.name == team_name {
                     Ok(Some(team))
                 } else {
                     Ok(None)
@@ -156,7 +187,13 @@ impl GitHubClient {
         let url = format!("https://api.github.com/orgs/{}/memberships/{}", self.org, login);
         match self.get(&url).await {
             Ok(response) => {
-                let membership: MembershipResponse = response.json().await?;
+                let text = response.text().await?;
+                if text.is_empty() {
+                    error!("Empty response body from GET {}", url);
+                    return Err(AppError::GitHubApi("Empty response body".to_string()));
+                }
+                let membership: MembershipResponse = serde_json::from_str(&text)
+                    .map_err(|e| AppError::GitHubApi(format!("Failed to parse response from {}: {}", url, e)))?;
                 Ok(Some(membership.role))
             }
             Err(AppError::GitHubApi(e)) if e.contains("404") => Ok(None),
@@ -171,7 +208,13 @@ impl GitHubClient {
         );
         match self.get(&url).await {
             Ok(response) => {
-                let perms: TeamRepoPermission = response.json().await?;
+                let text = response.text().await?;
+                if text.is_empty() {
+                    debug!("Empty response body from GET {}, assuming no permission", url);
+                    return Ok(None); // Treat empty response as no permission
+                }
+                let perms: TeamRepoPermission = serde_json::from_str(&text)
+                    .map_err(|e| AppError::GitHubApi(format!("Failed to parse response from {}: {}", url, e)))?;
                 let permission = if perms.permissions.admin {
                     "admin"
                 } else if perms.permissions.push {
@@ -226,8 +269,8 @@ impl GitHubClient {
     }
 
     pub async fn create_team(&self, team: &Team, dry_run: bool) -> AppResult<()> {
+        let existing = self.get_team(&team.name).await?;
         if dry_run {
-            let existing = self.get_team(&team.name).await?;
             if existing.is_none() {
                 info!("[Dry Run] Would create team: {}", team.name);
                 info!(
@@ -236,9 +279,13 @@ impl GitHubClient {
                 );
             } else {
                 debug!("[Dry Run] Team {} already exists", team.name);
+                info!(
+                    "[Dry Run] Would ensure members in {}: {:?}",
+                    team.name, team.members
+                );
             }
             Ok(())
-        } else {
+        } else if existing.is_none() {
             let url = format!("https://api.github.com/orgs/{}/teams", self.org);
             let body = json!({
                 "name": team.name,
@@ -246,7 +293,6 @@ impl GitHubClient {
             });
             info!("Creating team: {}", team.name);
             self.send_post(&url, body).await?;
-
             for member in &team.members {
                 let member_url = format!(
                     "https://api.github.com/orgs/{}/teams/{}/memberships/{}",
@@ -254,6 +300,19 @@ impl GitHubClient {
                 );
                 self.send_put(&member_url, None).await?;
                 info!("Added {} to team {}", member, team.name);
+            }
+            Ok(())
+        } else {
+            info!("Team {} already exists, updating members", team.name);
+            for member in &team.members {
+                let member_url = format!(
+                    "https://api.github.com/orgs/{}/teams/{}/memberships/{}",
+                    self.org, team.name, member
+                );
+                match self.send_put(&member_url, None).await {
+                    Ok(()) => info!("Added or confirmed {} in team {}", member, team.name),
+                    Err(e) => error!("Failed to add {} to team {}: {}", member, team.name, e),
+                }
             }
             Ok(())
         }

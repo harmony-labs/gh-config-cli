@@ -64,9 +64,9 @@ async fn run() -> AppResult<()> {
     }
 
     if args.dry_run {
-        info!("Dry run completed. No changes were applied.");
+        info!("Dry run completed successfully. No changes were applied.");
     } else {
-        info!("Configuration applied successfully.");
+        info!("Sync completed successfully. All changes applied.");
     }
     Ok(())
 }

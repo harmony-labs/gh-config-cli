@@ -1,21 +1,24 @@
 GITHUB_ORG ?= harmony-labs
 GITHUB_TOKEN ?=
+RUST_LOG ?= info
+
+.PHONY: build dry-run help list-repos sync
 
 build:
-	cargo build
+	@cargo build
 
 dry-run:
-	RUST_LOG=info cargo run -- --config config.yaml --token $(GITHUB_TOKEN) --dry-run
+	@GITHUB_TOKEN=$(GITHUB_TOKEN) RUST_LOG=$(RUST_LOG) cargo run -- --config config.yaml --dry-run
 
 help:
-	cargo run -- --help
+	@cargo run -- --help
 
 list-repos:
-	curl -L \
-		-H "Accept: application/vnd.github+json" \
-		-H "Authorization: Bearer $$GITHUB_TOKEN" \
-		-H "X-GitHub-Api-Version: 2022-11-28" \
-		"https://api.github.com/orgs/$(GITHUB_ORG)/repos?per_page=100" | jq -r '.[] | .git_url'
+	@curl -s -L \
+	-H "Accept: application/vnd.github+json" \
+	-H "Authorization: Bearer $(GITHUB_TOKEN)" \
+	-H "X-GitHub-Api-Version: 2022-11-28" \
+	"https://api.github.com/orgs/$(GITHUB_ORG)/repos?per_page=100" | jq -r '.[] | .git_url'
 
 sync:
-	cargo run -- --config config.yaml --token $(GITHUB_TOKEN)
+	@GITHUB_TOKEN=$(GITHUB_TOKEN) RUST_LOG=$(RUST_LOG) cargo run -- --config config.yaml
