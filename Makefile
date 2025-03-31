@@ -2,7 +2,7 @@ GITHUB_ORG ?= harmony-labs
 GITHUB_TOKEN ?=
 RUST_LOG ?= info
 
-.PHONY: build dry-run help list-repos sync
+.PHONY: build dry-run help list-repos sync sync-from-github
 
 build:
 	@cargo build
@@ -22,3 +22,6 @@ list-repos:
 
 sync:
 	@GITHUB_TOKEN=$(GITHUB_TOKEN) RUST_LOG=$(RUST_LOG) cargo run -- --config config.yaml
+
+sync-from-github:
+	@GITHUB_TOKEN=$(GITHUB_TOKEN) RUST_LOG=$(RUST_LOG) cargo run -- --config config.yaml --sync-from-org $(GITHUB_ORG) $(if $(filter true,$(DRY_RUN)),--dry-run,)
