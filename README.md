@@ -33,9 +33,11 @@ A Rust CLI tool to manage GitHub organization settings declaratively using YAML 
    - **Repository Permissions**:
      - **Administration**: Read and Write (to update repo settings like merge options and visibility).
      - **Contents**: Read-only (to fetch repo details).
+     - **Webhooks**: Read and Write (to set webhooks).
    - **Organization Permissions**:
      - **Administration**: Read and Write (to manage org settings and teams).
      - **Members**: Read and Write (to manage org memberships and roles).
+     - **Webhooks**: Read and Write (to set webhooks).
 7. Click **Generate token** and copy the token (e.g., `github_pat_11AAEHOXY0I5in52IE2hcX_...`).
 
 **Note**: Store this token securely and never commit it to your repository. Use environment variables or GitHub Secrets (see GitHub Actions setup).

@@ -1,8 +1,8 @@
-use crate::config::{Assignment, Repo, RepoSettings, Team, User};
+use crate::config::{Assignment, Repo, RepoSettings, Team, User, WebhookConfig};
 use crate::error::{AppError, AppResult};
 use log::{debug, info, error};
 use reqwest::Client;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 #[derive(Debug, Deserialize)]
@@ -33,6 +33,20 @@ struct PermissionDetails {
     pull: bool,
     push: bool,
     admin: bool,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct WebhookResponse {
+    id: Option<i64>,
+    url: String,
+    config: WebhookConfigResponse,
+    events: Vec<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct WebhookConfigResponse {
+    url: String,
+    content_type: String,
 }
 
 pub struct GitHubClient {
@@ -211,7 +225,7 @@ impl GitHubClient {
                 let text = response.text().await?;
                 if text.is_empty() {
                     debug!("Empty response body from GET {}, assuming no permission", url);
-                    return Ok(None); // Treat empty response as no permission
+                    return Ok(None);
                 }
                 let perms: TeamRepoPermission = serde_json::from_str(&text)
                     .map_err(|e| AppError::GitHubApi(format!("Failed to parse response from {}: {}", url, e)))?;
@@ -231,13 +245,88 @@ impl GitHubClient {
         }
     }
 
-    pub async fn update_repo_settings(&self, repo: &Repo, dry_run: bool) -> AppResult<()> {
-        if dry_run {
-            let current = self.get_repo_settings(&repo.name).await?;
-            let desired = &repo.settings;
-            let current_visibility = self.get_repo_visibility(&repo.name).await?;
-            let desired_visibility = repo.visibility.as_deref().unwrap_or("private");
+    async fn get_webhooks(&self, repo_name: &str) -> AppResult<Vec<WebhookResponse>> {
+        let url = format!("https://api.github.com/repos/{}/{}/hooks", self.org, repo_name);
+        let response = self.get(&url).await?;
+        let text = response.text().await?;
+        let webhooks: Vec<WebhookResponse> = serde_json::from_str(&text)
+            .map_err(|e| AppError::GitHubApi(format!("Failed to parse webhooks: {}", e)))?;
+        Ok(webhooks)
+    }
 
+    async fn create_webhook(&self, repo_name: &str, webhook: &WebhookConfig) -> AppResult<()> {
+        let url = format!("https://api.github.com/repos/{}/{}/hooks", self.org, repo_name);
+        let body = json!({
+            "name": "web",
+            "active": true,
+            "events": webhook.events,
+            "config": {
+                "url": webhook.url,
+                "content_type": webhook.content_type,
+                "insecure_ssl": "0"
+            }
+        });
+        debug!("Webhook create payload: {}", serde_json::to_string(&body)?); // Add this line
+        info!("Creating webhook for {}/{}", self.org, repo_name);
+        self.send_post(&url, body).await?;
+        Ok(())
+    }
+    
+    async fn update_webhook(&self, repo_name: &str, hook_id: i64, webhook: &WebhookConfig) -> AppResult<()> {
+        let url = format!("https://api.github.com/repos/{}/{}/hooks/{}", self.org, repo_name, hook_id);
+        let body = json!({
+            "active": true,
+            "events": webhook.events,
+            "config": {
+                "url": webhook.url,
+                "content_type": webhook.content_type,
+                "insecure_ssl": "0"
+            }
+        });
+        debug!("Webhook update payload: {}", serde_json::to_string(&body)?); // Add this line
+        info!("Updating webhook for {}/{}", self.org, repo_name);
+        self.send_patch(&url, body).await?;
+        Ok(())
+    }
+
+    async fn manage_webhooks(&self, repo_name: &str, webhook: &WebhookConfig, dry_run: bool) -> AppResult<()> {
+        let current_hooks = self.get_webhooks(repo_name).await?;
+        let existing = current_hooks.iter().find(|h| h.config.url == webhook.url);
+
+        if dry_run {
+            match existing {
+                Some(hook) if hook.events != webhook.events || hook.config.content_type != webhook.content_type => {
+                    info!(
+                        "[Dry Run] Would update webhook for {}/{}: events {:?} -> {:?}, content_type {} -> {}",
+                        self.org, repo_name, hook.events, webhook.events, hook.config.content_type, webhook.content_type
+                    );
+                }
+                Some(_) => debug!("[Dry Run] Webhook for {}/{} already matches desired config", self.org, repo_name),
+                None => info!(
+                    "[Dry Run] Would create webhook for {}/{} with config: {:?}",
+                    self.org, repo_name, webhook
+                ),
+            }
+        } else {
+            match existing {
+                Some(hook) if hook.events != webhook.events || hook.config.content_type != webhook.content_type => {
+                    self.update_webhook(repo_name, hook.id.unwrap(), webhook).await?;
+                }
+                Some(_) => debug!("Webhook for {}/{} already up to date", self.org, repo_name),
+                None => self.create_webhook(repo_name, webhook).await?,
+            }
+        }
+        Ok(())
+    }
+
+    pub async fn update_repo_settings(&self, repo: &Repo, dry_run: bool) -> AppResult<()> {
+        // Handle repository settings
+        let current = self.get_repo_settings(&repo.name).await?;
+        let desired = &repo.settings;
+        let current_visibility = self.get_repo_visibility(&repo.name).await?;
+        let desired_visibility = repo.visibility.as_deref().unwrap_or("private");
+
+        if dry_run {
             if current.allow_merge_commit != desired.allow_merge_commit
                 || current.allow_squash_merge != desired.allow_squash_merge
                 || current.allow_rebase_merge != desired.allow_rebase_merge
@@ -253,19 +342,28 @@ impl GitHubClient {
                     self.org, repo.name, current_visibility, desired_visibility
                 );
             }
-            Ok(())
         } else {
-            let url = format!("https://api.github.com/repos/{}/{}", self.org, repo.name);
-            let body = json!({
-                "allow_merge_commit": repo.settings.allow_merge_commit,
-                "allow_squash_merge": repo.settings.allow_squash_merge,
-                "allow_rebase_merge": repo.settings.allow_rebase_merge,
-                "private": repo.visibility.as_deref() != Some("public")
-            });
-            info!("Updating settings for {}/{}", self.org, repo.name);
-            self.send_patch(&url, body).await?;
-            Ok(())
+            if current.allow_merge_commit != desired.allow_merge_commit
+                || current.allow_squash_merge != desired.allow_squash_merge
+                || current.allow_rebase_merge != desired.allow_rebase_merge
+                || current_visibility != desired_visibility
+            {
+                let url = format!("https://api.github.com/repos/{}/{}", self.org, repo.name);
+                let body = json!({
+                    "allow_merge_commit": repo.settings.allow_merge_commit,
+                    "allow_squash_merge": repo.settings.allow_squash_merge,
+                    "allow_rebase_merge": repo.settings.allow_rebase_merge,
+                    "private": repo.visibility.as_deref() != Some("public")
+                });
+                info!("Updating settings for {}/{}", self.org, repo.name);
+                self.send_patch(&url, body).await?;
+            }
         }
+
+        // Handle webhook (always called since repo.webhook is guaranteed to be Some)
+        self.manage_webhooks(&repo.name, repo.webhook.as_ref().unwrap(), dry_run).await?;
+
+        Ok(())
     }
 
     pub async fn create_team(&self, team: &Team, dry_run: bool) -> AppResult<()> {

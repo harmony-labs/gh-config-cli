@@ -11,6 +11,8 @@ pub enum AppError {
     Http(#[from] reqwest::Error),
     #[error("Serialization error: {0}")]
     Serialization(#[from] serde_yaml::Error),
+    #[error("JSON error: {0}")]
+    Json(#[from] serde_json::Error), // Added for serde_json errors
 }
 
 pub type AppResult<T> = Result<T, AppError>;

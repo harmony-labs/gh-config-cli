@@ -1,5 +1,12 @@
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct WebhookConfig {
+    pub url: String,
+    pub content_type: String,
+    pub events: Vec<String>,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RepoSettings {
     pub allow_merge_commit: bool,
@@ -13,6 +20,8 @@ pub struct Repo {
     pub settings: RepoSettings,
     #[serde(default)]
     pub visibility: Option<String>, // "public" or "private"
+    #[serde(default)]
+    pub webhook: Option<WebhookConfig>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -41,6 +50,8 @@ pub struct Config {
     pub teams: Vec<Team>,
     pub users: Vec<User>,
     pub assignments: Vec<Assignment>,
+    #[serde(default)]
+    pub default_webhook: Option<WebhookConfig>,
 }
 
 impl Config {
