@@ -1,3 +1,4 @@
+CONFIG_FILE ?= config.yaml
 GITHUB_ORG ?= harmony-labs
 GITHUB_TOKEN ?=
 RUST_LOG ?= info
@@ -8,10 +9,10 @@ build:
 	@cargo build
 
 diff:
-	@GITHUB_TOKEN=$(GITHUB_TOKEN) RUST_LOG=$(RUST_LOG) cargo run -- diff config.yaml
+	@GITHUB_TOKEN=$(GITHUB_TOKEN) RUST_LOG=$(RUST_LOG) cargo run -- diff $(CONFIG_FILE)
 
 dry-run:
-	@GITHUB_TOKEN=$(GITHUB_TOKEN) RUST_LOG=$(RUST_LOG) cargo run -- sync config.yaml --dry-run
+	@GITHUB_TOKEN=$(GITHUB_TOKEN) RUST_LOG=$(RUST_LOG) cargo run -- sync $(CONFIG_FILE) --dry-run
 
 help:
 	@cargo run -- --help
@@ -21,7 +22,7 @@ list-repos:
 	"https://api.github.com/orgs/$(GITHUB_ORG)/repos?per_page=100" | jq -r '.[] | .git_url'
 
 sync:
-	@GITHUB_TOKEN=$(GITHUB_TOKEN) RUST_LOG=$(RUST_LOG) cargo run -- sync config.yaml
+	@GITHUB_TOKEN=$(GITHUB_TOKEN) RUST_LOG=$(RUST_LOG) cargo run -- sync $(CONFIG_FILE)
 
 sync-from-github:
-	@GITHUB_TOKEN=$(GITHUB_TOKEN) RUST_LOG=$(RUST_LOG) cargo run -- sync-from-org config.yaml --org $(GITHUB_ORG)
+	@GITHUB_TOKEN=$(GITHUB_TOKEN) RUST_LOG=$(RUST_LOG) cargo run -- sync-from-org $(CONFIG_FILE) --org $(GITHUB_ORG)
