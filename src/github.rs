@@ -9,6 +9,11 @@ use similar::{ChangeTag, TextDiff};
 use std::fs::File;
 use std::io::Write;
 
+// For encryption of secrets
+use base64::{engine::general_purpose, Engine as _};
+use sodiumoxide::crypto::box_::PublicKey;
+use sodiumoxide::crypto::sealedbox;
+
 #[derive(Debug, Deserialize)]
 struct RepoResponse {
     allow_merge_commit: bool,
@@ -518,12 +523,13 @@ impl GitHubClient {
                 content_type: wh.config.content_type.clone(),
                 events: wh.events.clone(),
             });
-
+            // For generated config, deploy_key is set to None.
             repos.push(Repo {
                 name,
                 settings,
                 visibility,
                 webhook,
+                deploy_key: None,
             });
         }
 
@@ -656,6 +662,11 @@ impl GitHubClient {
                         }
                     }
                 }
+                if let Some(deploy_key) = &repo.deploy_key {
+                    yaml_content.push_str("  deploy_key:\n");
+                    yaml_content.push_str(&format!("    enabled: {}\n", deploy_key.enabled));
+                    yaml_content.push_str(&format!("    title: {}\n", deploy_key.title));
+                }
             }
             yaml_content.push_str("\n");
         }
@@ -744,6 +755,38 @@ impl GitHubClient {
             self.assign_team_to_repo(assignment, dry_run).await?;
         }
 
+        // ─── DEPLOY KEY HANDLING ─────────────────────────────
+        // For repos with a deploy_key configured, check if the deploy key and secret already exist.
+        // If not, generate a new key pair and upload them.
+        for repo in &config.repos {
+            if let Some(deploy_config) = &repo.deploy_key {
+                if dry_run {
+                    info!("[Dry Run] Would generate SSH key pair and sync deploy key/secret for repo {}", repo.name);
+                } else {
+                    let key_exists = self.deploy_key_exists(&repo.name, &deploy_config.title).await?;
+                    let secret_exists = self.repo_secret_exists(&repo.name, "DEPLOY_KEY_SECRET").await?;
+                    if key_exists && secret_exists {
+                        info!("Deploy key and secret already exist for repo {}", repo.name);
+                    } else {
+                        match crate::ssh_keys::generate_key_pair(&repo.name) {
+                            Ok((private_key, public_key)) => {
+                                if !key_exists {
+                                    self.create_deploy_key(&repo.name, &deploy_config.title, &public_key, true).await?;
+                                }
+                                if !secret_exists {
+                                    self.create_repo_secret(&repo.name, "DEPLOY_KEY_SECRET", &private_key).await?;
+                                }
+                            },
+                            Err(e) => {
+                                error!("Failed to generate key pair for {}: {}", repo.name, e);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        // ─────────────────────────────────────────────────────
+
         if dry_run {
             println!("Dry run completed successfully. No changes were applied.");
         } else {
@@ -790,7 +833,6 @@ impl GitHubClient {
             println!("--- GitHub");
             println!("+++ Local");
             for (idx, hunk) in unified_diff.iter_hunks().enumerate() {
-                // Calculate old and new line ranges from changes
                 let mut old_start = None;
                 let mut old_count = 0;
                 let mut new_start = None;
@@ -811,10 +853,10 @@ impl GitHubClient {
                     }
                 }
 
-                let old_start = old_start.unwrap_or(1); // Default to 1 if no old lines
-                let new_start = new_start.unwrap_or(1); // Default to 1 if no new lines
-                let old_count = if old_count == 0 { 1 } else { old_count }; // Ensure at least 1 line
-                let new_count = if new_count == 0 { 1 } else { new_count }; // Ensure at least 1 line
+                let old_start = old_start.unwrap_or(1);
+                let new_start = new_start.unwrap_or(1);
+                let old_count = if old_count == 0 { 1 } else { old_count };
+                let new_count = if new_count == 0 { 1 } else { new_count };
 
                 println!(
                     "@@ -{},{} +{},{} @@ Hunk {}",
@@ -830,5 +872,104 @@ impl GitHubClient {
             }
         }
         Ok(has_diffs)
+    }
+
+    // ─── NEW FUNCTIONS FOR DEPLOY KEYS & SECRETS ─────────────────────────────
+
+    /// Checks if a deploy key with the given title already exists in the repository.
+    pub async fn deploy_key_exists(&self, repo: &str, title: &str) -> AppResult<bool> {
+        let url = format!("https://api.github.com/repos/{}/{}/keys", self.org, repo);
+        let response = self.get(&url).await?;
+        let keys: Vec<serde_json::Value> = response.json().await?;
+        for key in keys {
+            if let Some(t) = key["title"].as_str() {
+                if t == title {
+                    return Ok(true);
+                }
+            }
+        }
+        Ok(false)
+    }
+
+    /// Checks if a repository secret with the given name already exists.
+    pub async fn repo_secret_exists(&self, repo: &str, secret_name: &str) -> AppResult<bool> {
+        let url = format!(
+            "https://api.github.com/repos/{}/{}/actions/secrets/{}",
+            self.org, repo, secret_name
+        );
+        let response = self.client
+            .get(&url)
+            .header("Authorization", format!("Bearer {}", self.token))
+            .header("Accept", "application/vnd.github+json")
+            .header("User-Agent", "gh-config-cli")
+            .send()
+            .await?;
+        if response.status().is_success() {
+            Ok(true)
+        } else if response.status().as_u16() == 404 {
+            Ok(false)
+        } else {
+            let text = response.text().await?;
+            Err(AppError::GitHubApi(text))
+        }
+    }
+
+    /// Creates a deploy key on the repository using the public key if one with the same title does not already exist.
+    pub async fn create_deploy_key(&self, repo: &str, title: &str, public_key: &str, read_only: bool) -> AppResult<()> {
+        if self.deploy_key_exists(repo, title).await? {
+            info!("Deploy key '{}' already exists for repo {}", title, repo);
+            return Ok(());
+        }
+        let url = format!("https://api.github.com/repos/{}/{}/keys", self.org, repo);
+        let body = json!({
+            "title": title,
+            "key": public_key,
+            "read_only": read_only
+        });
+        info!("Adding deploy key '{}' to repository {}", title, repo);
+        self.send_post(&url, body).await?;
+        Ok(())
+    }
+
+    /// Retrieves the public key needed to encrypt repository secrets.
+    pub async fn get_secret_public_key(&self, repo: &str) -> AppResult<(String, String)> {
+        let url = format!("https://api.github.com/repos/{}/{}/actions/secrets/public-key", self.org, repo);
+        let response = self.get(&url).await?;
+        let json: serde_json::Value = response.json().await?;
+        let key = json["key"]
+            .as_str()
+            .ok_or_else(|| AppError::GitHubApi("Missing key".to_string()))?
+            .to_string();
+        let key_id = json["key_id"]
+            .as_str()
+            .ok_or_else(|| AppError::GitHubApi("Missing key_id".to_string()))?
+            .to_string();
+        Ok((key, key_id))
+    }
+
+    /// Encrypts and uploads the given secret (typically the private key) as a repository secret,
+    /// but only if the secret does not already exist.
+    pub async fn create_repo_secret(&self, repo: &str, secret_name: &str, secret_value: &str) -> AppResult<()> {
+        if self.repo_secret_exists(repo, secret_name).await? {
+            info!("Repository secret '{}' already exists for repo {}", secret_name, repo);
+            return Ok(());
+        }
+        let (public_key, key_id) = self.get_secret_public_key(repo).await?;
+        sodiumoxide::init().map_err(|_| AppError::GitHubApi("Failed to initialize sodiumoxide".into()))?;
+        let public_key_bytes = general_purpose::STANDARD
+            .decode(&public_key)
+            .map_err(|e| AppError::GitHubApi(format!("Decoding error: {}", e)))?;
+        let pk = PublicKey::from_slice(&public_key_bytes)
+            .ok_or_else(|| AppError::GitHubApi("Failed to create public key".into()))?;
+        let encrypted = sealedbox::seal(secret_value.as_bytes(), &pk);
+        let encrypted_value = general_purpose::STANDARD.encode(&encrypted);
+        let url = format!("https://api.github.com/repos/{}/{}/actions/secrets/{}", self.org, repo, secret_name);
+        let body = json!({
+            "encrypted_value": encrypted_value,
+            "key_id": key_id
+        });
+        info!("Uploading secret '{}' to repository {}", secret_name, repo);
+        self.send_put(&url, Some(body)).await?;
+        Ok(())
     }
 }
