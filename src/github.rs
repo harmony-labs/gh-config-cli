@@ -75,7 +75,7 @@ impl GitHubClient {
             .patch(url)
             .header("Authorization", format!("Bearer {}", self.token))
             .header("Accept", "application/vnd.github+json")
-            .header("User-Agent", "gh-config-cli")
+            .header("User-Agent", "gh-config")
             .json(&body)
             .send()
             .await?;
@@ -95,7 +95,7 @@ impl GitHubClient {
             .post(url)
             .header("Authorization", format!("Bearer {}", self.token))
             .header("Accept", "application/vnd.github+json")
-            .header("User-Agent", "gh-config-cli")
+            .header("User-Agent", "gh-config")
             .json(&body)
             .send()
             .await?;
@@ -115,7 +115,7 @@ impl GitHubClient {
             .put(url)
             .header("Authorization", format!("Bearer {}", self.token))
             .header("Accept", "application/vnd.github+json")
-            .header("User-Agent", "gh-config-cli");
+            .header("User-Agent", "gh-config");
         if let Some(body) = body {
             request = request.json(&body);
         }
@@ -136,7 +136,7 @@ impl GitHubClient {
             .get(url)
             .header("Authorization", format!("Bearer {}", self.token))
             .header("Accept", "application/vnd.github+json")
-            .header("User-Agent", "gh-config-cli")
+            .header("User-Agent", "gh-config")
             .send()
             .await?;
         let status = response.status();
@@ -687,14 +687,14 @@ impl GitHubClient {
         }
 
         if dry_run {
-            info!("Dry run: Would write the following config to {}:\n{}", config_path, yaml_content);
+            println!("Dry run: Would write the following config to {}:\n{}", config_path, yaml_content);
         } else {
-            info!("Writing generated config to {}", config_path);
+            println!("Writing generated config to {}", config_path);
             let mut file = File::create(config_path)
                 .map_err(|e| AppError::Io(e))?;
             file.write_all(yaml_content.as_bytes())
                 .map_err(|e| AppError::Io(e))?;
-            info!("Config generation completed successfully. No changes applied to GitHub.");
+            println!("Config generation completed successfully.");
         }
         Ok(())
     }
@@ -745,14 +745,14 @@ impl GitHubClient {
         }
 
         if dry_run {
-            info!("Dry run completed successfully. No changes were applied.");
+            println!("Dry run completed successfully. No changes were applied.");
         } else {
-            info!("Sync completed successfully. All changes applied.");
+            println!("Sync completed successfully. All changes applied.");
         }
         Ok(())
     }
 
-    pub async fn diff(&self, config_path: &str) -> AppResult<()> {
+    pub async fn diff(&self, config_path: &str) -> AppResult<bool> {
         info!("Generating diff between GitHub state and local config: {}", config_path);
 
         // Fetch GitHub's current state
@@ -781,11 +781,12 @@ impl GitHubClient {
         let mut unified_diff = diff.unified_diff();
         let unified_diff = unified_diff.context_radius(3).header("GitHub", "Local");
 
-        // Output the diff with line numbers
-        if unified_diff.iter_hunks().next().is_none() {
-            info!("No differences found between GitHub state and local config.");
+        // Check if there are any differences and output them
+        let has_diffs = unified_diff.iter_hunks().next().is_some();
+        if !has_diffs {
+            println!("No differences found between GitHub state and local config.");
         } else {
-            info!("Differences between GitHub state and local config (with line numbers):");
+            println!("Differences between GitHub state and local config (with line numbers):");
             println!("--- GitHub");
             println!("+++ Local");
             for (idx, hunk) in unified_diff.iter_hunks().enumerate() {
@@ -828,6 +829,6 @@ impl GitHubClient {
                 }
             }
         }
-        Ok(())
+        Ok(has_diffs)
     }
 }

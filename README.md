@@ -22,7 +22,7 @@ A Rust CLI tool to manage GitHub organization settings declaratively using YAML 
 
 ### Creating a GitHub Personal Access Token
 
-`gh-config-cli` requires a fine-grained PAT with permissions to manage your organization and repositories. Follow these steps to create one:
+`gh-config` requires a fine-grained PAT with permissions to manage your organization and repositories. Follow these steps to create one:
 
 1. **Log in to GitHub** and go to **Settings > Developer settings > Personal access tokens > Fine-grained tokens**.
 2. Click **Generate new token**.
@@ -46,6 +46,33 @@ A Rust CLI tool to manage GitHub organization settings declaratively using YAML 
 
 ## Installation
 
+1. **Download the Binary**:
+   - Go to the [Releases page](https://github.com/harmony-labs/gh-config-cli/releases).
+   - Download the latest `gh-config` binary for your platform (e.g., `gh-config` for Linux/macOS).
+
+2. **Make it Executable** (Linux/macOS):
+
+   chmod +x gh-config
+   mv gh-config /usr/local/bin/
+
+3. **Clone and Build from Source (Optional)**:
+
+   git clone https://github.com/harmony-labs/gh-config-cli.git
+   cd gh-config-cli
+   cargo build --release
+
+The binary will be at `./target/release/gh-config`.
+
+## Usage
+
+### Examples
+
+1. **Show Diff**:
+
+   gh-config diff path/to/config.yaml --token <your-pat>
+
+## Local Development
+
 1. Clone the repository:
    ```
    git clone https://github.com/<your-username>/gh-config-cli.git
@@ -57,7 +84,7 @@ A Rust CLI tool to manage GitHub organization settings declaratively using YAML 
    cargo build --release
    ```
 
-The binary will be available at `./target/release/gh-config-cli`.
+The binary will be available at `./target/release/gh-config`.
 
 ## Configuration
 
@@ -170,7 +197,7 @@ Run `cargo run -- --help` to see all options:
 5. **Using Installed Binary**:
    After `cargo install --path .`:
    ```
-   gh-config-cli --config config.yaml --token <your-pat> --diff
+   gh-config --config config.yaml --token <your-pat> --diff
    ```
 
 ### Makefile Commands
@@ -211,7 +238,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GH_PAT }}
           RUST_LOG: info
-        run: ./target/release/gh-config-cli --config config.yaml --token $GITHUB_TOKEN --dry-run
+        run: ./target/release/gh-config --config config.yaml --token $GITHUB_TOKEN --dry-run
 
   apply-config:
     if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true
@@ -229,7 +256,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GH_PAT }}
           RUST_LOG: info
-        run: ./target/release/gh-config-cli --config config.yaml --token $GITHUB_TOKEN
+        run: ./target/release/gh-config --config config.yaml --token $GITHUB_TOKEN
 ```
 
 ### Setup

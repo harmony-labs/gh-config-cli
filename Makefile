@@ -8,10 +8,10 @@ build:
 	@cargo build
 
 diff:
-	@GITHUB_TOKEN=$(GITHUB_TOKEN) RUST_LOG=$(RUST_LOG) cargo run -- --config config.yaml --diff
+	@GITHUB_TOKEN=$(GITHUB_TOKEN) RUST_LOG=$(RUST_LOG) cargo run -- diff config.yaml
 
 dry-run:
-	@GITHUB_TOKEN=$(GITHUB_TOKEN) RUST_LOG=$(RUST_LOG) cargo run -- --config config.yaml --dry-run
+	@GITHUB_TOKEN=$(GITHUB_TOKEN) RUST_LOG=$(RUST_LOG) cargo run -- sync config.yaml --dry-run
 
 help:
 	@cargo run -- --help
@@ -21,7 +21,7 @@ list-repos:
 	"https://api.github.com/orgs/$(GITHUB_ORG)/repos?per_page=100" | jq -r '.[] | .git_url'
 
 sync:
-	@GITHUB_TOKEN=$(GITHUB_TOKEN) RUST_LOG=$(RUST_LOG) cargo run -- --config config.yaml
+	@GITHUB_TOKEN=$(GITHUB_TOKEN) RUST_LOG=$(RUST_LOG) cargo run -- sync config.yaml
 
 sync-from-github:
-	@GITHUB_TOKEN=$(GITHUB_TOKEN) RUST_LOG=$(RUST_LOG) cargo run -- --config config.yaml --sync-from-org $(GITHUB_ORG) $(if $(filter true,$(DRY_RUN)),--dry-run,)
+	@GITHUB_TOKEN=$(GITHUB_TOKEN) RUST_LOG=$(RUST_LOG) cargo run -- sync-from-org config.yaml --org $(GITHUB_ORG)
