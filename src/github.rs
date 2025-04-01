@@ -1,9 +1,11 @@
 use crate::config::{Assignment, Repo, RepoSettings, Team, User, WebhookConfig, Config};
 use crate::error::{AppError, AppResult};
+use colored::*;
 use log::{debug, info, error};
 use reqwest::Client;
-use serde::{Deserialize, Serialize};
 use serde_json::json;
+use serde::{Deserialize, Serialize};
+use similar::{ChangeTag, TextDiff};
 use std::fs::File;
 use std::io::Write;
 
@@ -746,6 +748,85 @@ impl GitHubClient {
             info!("Dry run completed successfully. No changes were applied.");
         } else {
             info!("Sync completed successfully. All changes applied.");
+        }
+        Ok(())
+    }
+
+    pub async fn diff(&self, config_path: &str) -> AppResult<()> {
+        info!("Generating diff between GitHub state and local config: {}", config_path);
+
+        // Fetch GitHub's current state
+        let mut github_config = self.generate_config_from_org().await?;
+
+        // Load and consolidate local config (apply default_webhook to repos)
+        let mut local_config = Config::from_file(config_path)?;
+        if let Some(default_webhook) = &local_config.default_webhook {
+            for repo in &mut local_config.repos {
+                if repo.webhook.is_none() {
+                    repo.webhook = Some(default_webhook.clone());
+                }
+            }
+        }
+
+        // Sort repos alphabetically by name in both configs
+        github_config.repos.sort_by(|a, b| a.name.cmp(&b.name));
+        local_config.repos.sort_by(|a, b| a.name.cmp(&b.name));
+
+        // Serialize both configs to YAML strings
+        let github_yaml = serde_yaml::to_string(&github_config)?;
+        let local_yaml = serde_yaml::to_string(&local_config)?;
+
+        // Compute the unified diff with line numbers and context
+        let diff = TextDiff::from_lines(&github_yaml, &local_yaml);
+        let mut unified_diff = diff.unified_diff();
+        let unified_diff = unified_diff.context_radius(3).header("GitHub", "Local");
+
+        // Output the diff with line numbers
+        if unified_diff.iter_hunks().next().is_none() {
+            info!("No differences found between GitHub state and local config.");
+        } else {
+            info!("Differences between GitHub state and local config (with line numbers):");
+            println!("--- GitHub");
+            println!("+++ Local");
+            for (idx, hunk) in unified_diff.iter_hunks().enumerate() {
+                // Calculate old and new line ranges from changes
+                let mut old_start = None;
+                let mut old_count = 0;
+                let mut new_start = None;
+                let mut new_count = 0;
+
+                for change in hunk.iter_changes() {
+                    if let Some(old_line) = change.old_index() {
+                        if old_start.is_none() {
+                            old_start = Some(old_line + 1); // 1-based indexing
+                        }
+                        old_count += 1;
+                    }
+                    if let Some(new_line) = change.new_index() {
+                        if new_start.is_none() {
+                            new_start = Some(new_line + 1); // 1-based indexing
+                        }
+                        new_count += 1;
+                    }
+                }
+
+                let old_start = old_start.unwrap_or(1); // Default to 1 if no old lines
+                let new_start = new_start.unwrap_or(1); // Default to 1 if no new lines
+                let old_count = if old_count == 0 { 1 } else { old_count }; // Ensure at least 1 line
+                let new_count = if new_count == 0 { 1 } else { new_count }; // Ensure at least 1 line
+
+                println!(
+                    "@@ -{},{} +{},{} @@ Hunk {}",
+                    old_start, old_count, new_start, new_count, idx + 1
+                );
+                for change in hunk.iter_changes() {
+                    match change.tag() {
+                        ChangeTag::Delete => println!("{}", format!("- {}", change.value().trim_end()).red()),
+                        ChangeTag::Insert => println!("{}", format!("+ {}", change.value().trim_end()).green()),
+                        ChangeTag::Equal => println!("  {}", change.value().trim_end()),
+                    }
+                }
+            }
         }
         Ok(())
     }

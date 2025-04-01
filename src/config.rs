@@ -7,7 +7,7 @@ pub struct WebhookConfig {
     pub events: Vec<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct RepoSettings {
     pub allow_merge_commit: bool,
     pub allow_squash_merge: bool,

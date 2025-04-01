@@ -3,6 +3,7 @@ mod error;
 mod github;
 
 use clap::Parser;
+use config::Config;  // Add this direct import
 use error::AppResult;
 use github::GitHubClient;
 use log::{error, info};
@@ -26,6 +27,10 @@ struct Args {
     /// Generate config from the specified GitHub org and write to file (e.g., "harmony-labs")
     #[arg(long)]
     sync_from_org: Option<String>,
+
+    /// Show diff between GitHub state and local config file
+    #[arg(long)]
+    diff: bool,
 }
 
 #[tokio::main]
@@ -41,12 +46,17 @@ async fn run() -> AppResult<()> {
     let args = Args::parse();
     info!("Starting gh-config-cli with config: {}", args.config);
 
-    let mut client = match &args.sync_from_org {
-        Some(org) => GitHubClient::new(&args.token, org),
-        None => GitHubClient::new(&args.token, "placeholder"),
+    let mut client = if let Some(org) = &args.sync_from_org {
+        GitHubClient::new(&args.token, org)
+    } else {
+        // Load the config file to get the org if not provided via --sync-from-org
+        let config = Config::from_file(&args.config)?;
+        GitHubClient::new(&args.token, &config.org)
     };
 
-    if args.sync_from_org.is_some() {
+    if args.diff {
+        client.diff(&args.config).await?;
+    } else if args.sync_from_org.is_some() {
         client.generate_config_and_write(&args.config, args.dry_run).await?;
     } else {
         client.sync(&args.config, args.dry_run).await?;
