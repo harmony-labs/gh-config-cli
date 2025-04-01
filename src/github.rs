@@ -396,15 +396,57 @@ impl GitHubClient {
 
     // ─── NEW FUNCTIONS FOR DEPLOY KEYS & SECRETS ─────────────────────────────
 
-    /// Creates a deploy key on the repository using the public key.
-    pub async fn create_deploy_key(&self, repo: &str, title: &str, public_key: &str, read_only: bool) -> AppResult<()> {
+    /// Checks if a deploy key with the given name already exists in the repository.
+    pub async fn deploy_key_exists(&self, repo: &str, name: &str) -> AppResult<bool> {
+        let url = format!("https://api.github.com/repos/{}/{}/keys", self.org, repo);
+        let response = self.get(&url).await?;
+        let keys: Vec<serde_json::Value> = response.json().await?;
+        for key in keys {
+            if let Some(t) = key["name"].as_str() {
+                if t == name {
+                    return Ok(true);
+                }
+            }
+        }
+        Ok(false)
+    }
+
+    /// Checks if a repository secret with the given name already exists.
+    pub async fn repo_secret_exists(&self, repo: &str, secret_name: &str) -> AppResult<bool> {
+        let url = format!(
+            "https://api.github.com/repos/{}/{}/actions/secrets/{}",
+            self.org, repo, secret_name
+        );
+        let response = self.client
+            .get(&url)
+            .header("Authorization", format!("Bearer {}", self.token))
+            .header("Accept", "application/vnd.github+json")
+            .header("User-Agent", "gh-config-cli")
+            .send()
+            .await?;
+        if response.status().is_success() {
+            Ok(true)
+        } else if response.status().as_u16() == 404 {
+            Ok(false)
+        } else {
+            let text = response.text().await?;
+            Err(AppError::GitHubApi(text))
+        }
+    }
+
+    /// Creates a deploy key on the repository using the public key if one with the same name does not already exist.
+    pub async fn create_deploy_key(&self, repo: &str, name: &str, public_key: &str, read_only: bool) -> AppResult<()> {
+        if self.deploy_key_exists(repo, name).await? {
+            info!("Deploy key '{}' already exists for repo {}", name, repo);
+            return Ok(());
+        }
         let url = format!("https://api.github.com/repos/{}/{}/keys", self.org, repo);
         let body = json!({
-            "title": title,
+            "name": name,
             "key": public_key,
             "read_only": read_only
         });
-        info!("Adding deploy key '{}' to repository {}", title, repo);
+        info!("Adding deploy key '{}' to repository {}", name, repo);
         self.send_post(&url, body).await?;
         Ok(())
     }
@@ -425,8 +467,13 @@ impl GitHubClient {
         Ok((key, key_id))
     }
 
-    /// Encrypts and uploads the given secret (typically the private key) as a repository secret.
+    /// Encrypts and uploads the given secret (typically the private key) as a repository secret,
+    /// but only if the secret does not already exist.
     pub async fn create_repo_secret(&self, repo: &str, secret_name: &str, secret_value: &str) -> AppResult<()> {
+        if self.repo_secret_exists(repo, secret_name).await? {
+            info!("Repository secret '{}' already exists for repo {}", secret_name, repo);
+            return Ok(());
+        }
         let (public_key, key_id) = self.get_secret_public_key(repo).await?;
         sodiumoxide::init().map_err(|_| AppError::GitHubApi("Failed to initialize sodiumoxide".into()))?;
         let public_key_bytes = general_purpose::STANDARD

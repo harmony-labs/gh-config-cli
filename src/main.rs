@@ -52,21 +52,32 @@ async fn run() -> AppResult<()> {
         client.update_repo_settings(repo, args.dry_run).await?;
 
         // Check if deploy key is enabled for this repo
-        if let Some(deploy_config) = &repo.deploy_key {
-            if args.dry_run {
-                info!("[Dry Run] Would generate SSH key pair and sync deploy key and secret for repo {}", repo.name);
+    if let Some(deploy_config) = &repo.deploy_key {
+        if args.dry_run {
+            info!("[Dry Run] Would check and generate SSH key pair for deploy key and secret for repo {}", repo.name);
+        } else {
+            // Check if the deploy key and secret already exist
+            let key_exists = client.deploy_key_exists(&repo.name, &deploy_config.name).await?;
+            let secret_exists = client.repo_secret_exists(&repo.name, &deploy_config.name).await?;
+
+            if key_exists && secret_exists {
+                info!("Deploy key and secret already exist for repo {}", repo.name);
             } else {
-                match ssh_keys::generate_key_pair(&repo.name) {
-                    Ok((private_key, public_key)) => {
-                        client.create_deploy_key(&repo.name, &deploy_config.title, &public_key, true).await?;
-                        client.create_repo_secret(&repo.name, "DEPLOY_KEY_SECRET", &private_key).await?;
-                    },
-                    Err(e) => {
+                // Only generate a new key pair if either key or secret is missing.
+                let (private_key, public_key) = ssh_keys::generate_key_pair(&repo.name)
+                    .map_err(|e| {
                         error!("Failed to generate key pair for {}: {}", repo.name, e);
-                    }
+                        e
+                    })?;
+                if !key_exists {
+                    client.create_deploy_key(&repo.name, &deploy_config.name, &public_key, true).await?;
+                }
+                if !secret_exists {
+                    client.create_repo_secret(&repo.name, &deploy_config.name, &private_key).await?;
                 }
             }
         }
+    }
     }
 
     for team in &config.teams {

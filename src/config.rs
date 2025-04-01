@@ -10,7 +10,7 @@ pub struct RepoSettings {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DeployKey {
     pub enabled: bool,
-    pub title: String,
+    pub name: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
