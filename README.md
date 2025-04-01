@@ -1,17 +1,19 @@
 # gh-config-cli
 
-A Rust CLI tool to manage GitHub organization settings declaratively using YAML files. Define repositories, teams, users, and assignments in a config file, and apply or validate changes via the GitHub API.
+A Rust CLI tool to manage GitHub organization settings declaratively using YAML files. Define repositories, teams, users, and assignments in a config file, and apply, validate, or diff changes against the GitHub API.
 
 ## Features
 
 - **Declarative Configuration**: Manage GitHub org settings with a single YAML file.
 - **Dry Run Mode**: Validate changes without applying them, showing what would happen.
+- **Diff Command**: Compare the local config with the current GitHub state, displaying differences in a line-numbered YAML format.
 - **GitHub Actions Integration**: Automatically validate on PR pushes and apply on merge.
 - **Supported Entities**:
-  - Repositories (merge settings: squash, rebase, merge commits).
+  - Repositories (merge settings: squash, rebase, merge commits; visibility; webhooks).
   - Teams (creation and member assignment).
   - Users (org membership and roles).
   - Team-to-repo assignments (permissions).
+  - Default webhook configuration applied to all repos unless overridden.
 
 ## Prerequisites
 
@@ -38,20 +40,20 @@ A Rust CLI tool to manage GitHub organization settings declaratively using YAML 
      - **Administration**: Read and Write (to manage org settings and teams).
      - **Members**: Read and Write (to manage org memberships and roles).
      - **Webhooks**: Read and Write (to set webhooks).
-7. Click **Generate token** and copy the token (e.g., `github_pat_11AAEHOXY0I5in52IE2hcX_...`).
+7. Click **Generate token** and copy the token (e.g., `github_pat_XYZ...`).
 
-**Note**: Store this token securely and never commit it to your repository. Use environment variables or GitHub Secrets (see GitHub Actions setup).
+**Note**: Store this token securely and never commit it to your repository. Use environment variables (e.g., `GITHUB_TOKEN`) or GitHub Secrets (see GitHub Actions setup).
 
 ## Installation
 
 1. Clone the repository:
-   ```bash
+   ```
    git clone https://github.com/<your-username>/gh-config-cli.git
    cd gh-config-cli
    ```
 
 2. Build the project:
-   ```bash
+   ```
    cargo build --release
    ```
 
@@ -61,8 +63,14 @@ The binary will be available at `./target/release/gh-config-cli`.
 
 Define your GitHub organization settings in a YAML file (e.g., `config.yaml`). Example:
 
-```yaml
+```
 org: harmony-labs
+default_webhook:
+  url: https://discord.com/api/webhooks/1234567890/...
+  content_type: json
+  events:
+    - push
+    - pull_request
 repos:
   - name: harmony
     settings:
@@ -86,10 +94,15 @@ assignments:
 ### Schema
 
 - `org`: The GitHub organization name (e.g., `harmony-labs`).
-- `repos`: List of repositories with merge settings.
+- `default_webhook`: Optional default webhook configuration applied to all repos unless overridden.
+  - `url`: Webhook URL (e.g., Discord webhook).
+  - `content_type`: Format of webhook payload (e.g., `json`).
+  - `events`: List of GitHub events to trigger the webhook (e.g., `push`, `pull_request`).
+- `repos`: List of repositories.
   - `name`: Repository name (e.g., `harmony`).
   - `settings`: Merge options (`allow_merge_commit`, `allow_squash_merge`, `allow_rebase_merge`).
   - `visibility`: Optional, `public` or `private` (defaults to `private` if omitted).
+  - `webhook`: Optional per-repo webhook overriding `default_webhook`.
 - `teams`: List of teams.
   - `name`: Team name (e.g., `core-team`).
   - `members`: List of GitHub usernames.
@@ -105,92 +118,126 @@ assignments:
 
 ### Command-Line Options
 
-```bash
-cargo run -- --help
-```
+Run `cargo run -- --help` to see all options:
 
 - `--config <PATH>`: Path to the YAML config file (default: `config.yaml`).
 - `--token <TOKEN>`: GitHub PAT (or set via `GITHUB_TOKEN` env var).
 - `--dry-run`: Validate changes without applying them.
+- `--sync-from-org <ORG>`: Generate a config file from the specified GitHub org.
+- `--diff`: Show a line-numbered diff between the local config and GitHub state.
 
 ### Examples
 
 1. **Apply Changes**:
-   ```bash
+   ```
    cargo run -- --config config.yaml --token <your-pat>
    ```
 
 2. **Dry Run (Validation)**:
-   ```bash
+   ```
    RUST_LOG=info cargo run -- --config config.yaml --token <your-pat> --dry-run
    ```
    Output example:
-    ```
-    INFO  gh_org_manager: Running in dry-run mode; validating changes without applying.
-    INFO  gh_org_manager::github: [Dry Run] Would update harmony-labs/harmony settings: RepoSettings { allow_merge_commit: true, ... } -> RepoSettings { allow_merge_commit: false, ... }
-    ```
+   ```
+   INFO  gh_config_cli: Running in dry-run mode; validating changes without applying.
+   INFO  gh_config_cli::github: [Dry Run] Would update harmony-labs/harmony settings: RepoSettings { allow_merge_commit: true, ... } -> RepoSettings { allow_merge_commit: false, ... }
+   ```
 
-3. **Using Installed Binary**:
-After `cargo install --path .`:
-```bash
-gh-config-cli --config config.yaml --token <your-pat>
-```
+3. **Generate Config from GitHub**:
+   ```
+   cargo run -- --config config.yaml --token <your-pat> --sync-from-org harmony-labs
+   ```
+
+4. **Show Diff**:
+   ```
+   cargo run -- --config config.yaml --token <your-pat> --diff
+   ```
+   Output example:
+   ```
+   --- GitHub
+   +++ Local
+   @@ -1,5 +1,5 @@ Hunk 1
+    org: harmony-labs
+    repos:
+    - name: harmony
+      settings:
+   -    allow_merge_commit: true
+   +    allow_merge_commit: false
+        allow_squash_merge: true
+        allow_rebase_merge: true
+   ```
+
+5. **Using Installed Binary**:
+   After `cargo install --path .`:
+   ```
+   gh-config-cli --config config.yaml --token <your-pat> --diff
+   ```
+
+### Makefile Commands
+
+- `make build`: Build the project.
+- `make diff`: Run the diff command.
+- `make dry-run`: Run in dry-run mode.
+- `make sync`: Apply the config.
+- `make sync-from-github`: Generate config from GitHub.
+- `make list-repos`: List org repos.
+- `make help`: Show CLI help.
 
 ## GitHub Actions Integration
 
 Automate validation and application with GitHub Actions. Add this workflow to `.github/workflows/validate-org.yml`:
 
-```yaml
+```
 name: Validate GitHub Org Config
 
 on:
   pull_request:
- branches: [main]
+    branches: [main]
   push:
- branches: [main]
+    branches: [main]
 
 jobs:
   validate-config:
- runs-on: ubuntu-latest
- steps:
-   - uses: actions/checkout@v4
-   - name: Set up Rust
-     uses: actions-rs/toolchain@v1
-     with:
-       toolchain: stable
-   - name: Build CLI
-     run: cargo build --release
-   - name: Validate Config (Dry Run)
-     env:
-       GITHUB_TOKEN: ${{ secrets.GH_PAT }}
-       RUST_LOG: info
-     run: ./target/release/gh-config-cli --config config.yaml --token $GITHUB_TOKEN --dry-run
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - name: Build CLI
+        run: cargo build --release
+      - name: Validate Config (Dry Run)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+          RUST_LOG: info
+        run: ./target/release/gh-config-cli --config config.yaml --token $GITHUB_TOKEN --dry-run
 
   apply-config:
- if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true
- runs-on: ubuntu-latest
- needs: validate-config
- steps:
-   - uses: actions/checkout@v4
-   - name: Set up Rust
-     uses: actions-rs/toolchain@v1
-     with:
-       toolchain: stable
-   - name: Build CLI
-     run: cargo build --release
-   - name: Apply Config
-     env:
-       GITHUB_TOKEN: ${{ secrets.GH_PAT }}
-       RUST_LOG: info
-     run: ./target/release/gh-config-cli --config config.yaml --token $GITHUB_TOKEN
+    if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    needs: validate-config
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - name: Build CLI
+        run: cargo build --release
+      - name: Apply Config
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+          RUST_LOG: info
+        run: ./target/release/gh-config-cli --config config.yaml --token $GITHUB_TOKEN
 ```
 
 ### Setup
 
 1. **Store PAT in GitHub Secrets**:
-- Go to your repository’s **Settings > Secrets and variables > Actions**.
-- Click **New repository secret**.
-- Name it `GH_PAT` and paste your PAT value.
+   - Go to your repository’s **Settings > Secrets and variables > Actions**.
+   - Click **New repository secret**.
+   - Name it `GH_PAT` and paste your PAT value.
 2. Push changes to a PR; the `validate-config` job runs on each commit.
 3. Merge the PR; the `apply-config` job applies the changes.
 
