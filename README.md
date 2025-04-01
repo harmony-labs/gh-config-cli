@@ -17,7 +17,6 @@ A Rust CLI tool to manage GitHub organization settings declaratively using YAML 
 
 ## Prerequisites
 
-- Rust (stable) installed (see [rustup.rs](https://rustup.rs/)).
 - A GitHub Personal Access Token (PAT) with specific fine-grained permissions (see below).
 
 ### Creating a GitHub Personal Access Token
@@ -29,8 +28,8 @@ A Rust CLI tool to manage GitHub organization settings declaratively using YAML 
 3. **Token Name**: Enter a descriptive name (e.g., `gh-config-cli-token`).
 4. **Expiration**: Choose a suitable expiration date (e.g., 90 days or no expiration, depending on your security policy).
 5. **Repository Access**:
-   - Select **Only select repositories** if you want to limit access, then choose all repositories listed in your `config.yaml` (e.g., `harmony-labs/harmony`, `harmony-labs/vnext`, etc.).
-   - Alternatively, select **All repositories** under the organization `harmony-labs` for broader access.
+   - Select **Only select repositories** if you want to limit access, then choose all repositories listed in your `config.yaml`.
+   - Alternatively, select **All repositories** under your organization for broader access.
 6. **Permissions**:
    - **Repository Permissions**:
      - **Administration**: Read and Write (to update repo settings like merge options and visibility).
@@ -44,53 +43,258 @@ A Rust CLI tool to manage GitHub organization settings declaratively using YAML 
 
 **Note**: Store this token securely and never commit it to your repository. Use environment variables (e.g., `GITHUB_TOKEN`) or GitHub Secrets (see GitHub Actions setup).
 
-## Installation
+## Downloading and Using Locally
+
+### Installation from GitHub Releases
 
 1. **Download the Binary**:
-   - Go to the [Releases page](https://github.com/harmony-labs/gh-config-cli/releases).
-   - Download the latest `gh-config` binary for your platform (e.g., `gh-config` for Linux/macOS).
+   - Visit the [Releases page](https://github.com/harmony-labs/gh-config-cli/releases).
+   - Find the latest release (e.g., `v0.1.0`) and download the `gh-config` binary for your platform:
+     - Linux/macOS: `gh-config` (e.g., `gh-config-v0.1.0-linux` or `gh-config-v0.1.0-macos`).
+     - Windows: `gh-config.exe` (e.g., `gh-config-v0.1.0-windows.exe`).
 
-2. **Make it Executable** (Linux/macOS):
-
+2. **Make it Executable (Linux/macOS)**:
+   ```bash
    chmod +x gh-config
-   mv gh-config /usr/local/bin/
+   ```
 
-3. **Clone and Build from Source (Optional)**:
+3. **Move to a Directory in Your PATH** (Optional, for convenience):
+   - Linux/macOS:
+     ```bash
+     sudo mv gh-config /usr/local/bin/
+     ```
+   - Windows: Move `gh-config.exe` to a directory in your PATH (e.g., `C:\Program Files\gh-config`), then add it to your system PATH via environment variables.
 
-   git clone https://github.com/harmony-labs/gh-config-cli.git
-   cd gh-config-cli
-   cargo build --release
+4. **Verify Installation**:
+   ```bash
+   gh-config --version
+   ```
+   Expected output: `gh-config-cli 0.1.0` (or the downloaded version).
 
-The binary will be at `./target/release/gh-config`.
-
-## Usage
-
-### Examples
+### Usage Examples
 
 1. **Show Diff**:
+   - Using `--token`:
+     ```bash
+     gh-config --token <your-pat> diff config.yaml
+     ```
+   - Using `GITHUB_TOKEN` env var:
+     ```bash
+     GITHUB_TOKEN=<your-pat> gh-config diff config.yaml
+     ```
 
-   gh-config diff path/to/config.yaml --token <your-pat>
+2. **Apply Changes**:
+   - Using `--token`:
+     ```bash
+     gh-config --token <your-pat> sync config.yaml
+     ```
+   - Using `GITHUB_TOKEN` env var:
+     ```bash
+     GITHUB_TOKEN=<your-pat> gh-config sync config.yaml
+     ```
+
+3. **Dry Run (Validation)**:
+   - Using `--token`:
+     ```bash
+     gh-config --token <your-pat> sync config.yaml --dry-run
+     ```
+   - Using `GITHUB_TOKEN` env var:
+     ```bash
+     GITHUB_TOKEN=<your-pat> gh-config sync config.yaml --dry-run
+     ```
+
+4. **Generate Config from GitHub**:
+   - Using `--token`:
+     ```bash
+     gh-config --token <your-pat> sync-from-org config.yaml --org harmony-labs
+     ```
+   - Using `GITHUB_TOKEN` env var:
+     ```bash
+     GITHUB_TOKEN=<your-pat> gh-config sync-from-org config.yaml --org harmony-labs
+     ```
 
 ## Local Development
 
-1. Clone the repository:
-   ```
-   git clone https://github.com/<your-username>/gh-config-cli.git
+For contributors or those who prefer building from source:
+
+### Prerequisites
+
+- Rust (stable) installed (see [rustup.rs](https://rustup.rs/)).
+
+### Setup
+
+1. **Clone the Repository**:
+   ```bash
+   git clone https://github.com/harmony-labs/gh-config-cli.git
    cd gh-config-cli
    ```
 
-2. Build the project:
-   ```
+2. **Build the Project**:
+   ```bash
    cargo build --release
    ```
+   The binary will be at `./target/release/gh-config`.
 
-The binary will be available at `./target/release/gh-config`.
+### Running Locally
+
+Use `make` for convenience during development:
+
+- **Build**:
+   ```bash
+   make build
+   ```
+
+- **Show Diff**:
+   ```bash
+   GITHUB_TOKEN=<your-pat> make diff CONFIG_FILE=config.yaml
+   ```
+
+- **Dry Run**:
+   ```bash
+   GITHUB_TOKEN=<your-pat> make dry-run CONFIG_FILE=config.yaml
+   ```
+
+- **Sync**:
+   ```bash
+   GITHUB_TOKEN=<your-pat> make sync CONFIG_FILE=config.yaml
+   ```
+
+- **Generate Config from GitHub**:
+   ```bash
+   GITHUB_TOKEN=<your-pat> make sync-from-github CONFIG_FILE=config.yaml GITHUB_ORG=harmony-labs
+   ```
+
+- **Help**:
+   ```bash
+   make help
+   ```
+
+**Note**: `make` is only for local development of `gh-config-cli`. For using the tool in your projects, use the released binary directly (see above).
+
+## Using in GitHub Actions
+
+Automate validation and application with GitHub Actions using the released binary.
+
+### Basic Example: Validate and Apply Config
+
+Add this workflow to `.github/workflows/validate-org.yml` to validate on PRs and apply on push to `main`:
+
+```yaml
+name: Validate GitHub Org Config
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  validate-config:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download gh-config Binary
+        run: |
+          curl -L -o gh-config https://github.com/harmony-labs/gh-config-cli/releases/latest/download/gh-config
+          chmod +x gh-config
+          sudo mv gh-config /usr/local/bin/
+      - name: Validate Config (Dry Run)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+          RUST_LOG: info
+        run: gh-config --token $GITHUB_TOKEN sync config.yaml --dry-run
+
+  apply-config:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    needs: validate-config
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download gh-config Binary
+        run: |
+          curl -L -o gh-config https://github.com/harmony-labs/gh-config-cli/releases/latest/download/gh-config
+          chmod +x gh-config
+          sudo mv gh-config /usr/local/bin/
+      - name: Apply Config
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+          RUST_LOG: info
+        run: gh-config --token $GITHUB_TOKEN sync config.yaml
+```
+
+### Advanced Example: Scheduled Diff and PR Creation
+
+Add this workflow to `.github/workflows/diff-and-pr.yml` to check for differences daily and create a PR if needed:
+
+```yaml
+name: Check Diff and Create PR
+
+on:
+  schedule:
+    - cron: '0 0 * * *' # Daily at midnight UTC
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  diff-and-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download gh-config
+        run: |
+          curl -L -o gh-config https://github.com/harmony-labs/gh-config-cli/releases/latest/download/gh-config
+          chmod +x gh-config
+      - name: Run Diff
+        id: diff
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+          RUST_LOG: info
+        run: |
+          ./gh-config diff config.yaml > diff_output.txt 2>&1
+          echo "EXIT_CODE=$?" >> $GITHUB_ENV
+      - name: Generate New Config
+        if: env.EXIT_CODE == 1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+          RUST_LOG: info
+        run: |
+          ./gh-config sync-from-org config.yaml.new --org harmony-labs
+      - name: Create PR
+        if: env.EXIT_CODE == 1
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: auto-update-config-${{ github.run_id }}
+          title: "Auto-update config.yaml from GitHub state"
+          body: |
+            Differences found between local config and GitHub state. Updating config.yaml with latest changes.
+            Diff output:
+            ```
+            $(cat diff_output.txt)
+            ```
+          commit-message: "Update config.yaml from GitHub state"
+          delete-branch: true
+          add-paths: config.yaml.new
+          labels: auto-update
+```
+
+### Setup for Both Workflows
+
+1. **Store PAT in GitHub Secrets**:
+   - Go to your repository’s **Settings > Secrets and variables > Actions**.
+   - Click **New repository secret**.
+   - Name it `GH_PAT` and paste your PAT value.
+
+2. **Workflow Behavior**:
+   - **Basic Example**: Validates on PRs with `--dry-run` and applies on push to `main`.
+   - **Advanced Example**: Runs daily (or manually), checks for differences, and creates a PR with the updated config if differences are found.
+
+**Note**: Both workflows use the released binary from GitHub Releases, ensuring consistency. The advanced example requires the `peter-evans/create-pull-request` action.
 
 ## Configuration
 
 Define your GitHub organization settings in a YAML file (e.g., `config.yaml`). Example:
 
-```
+```yaml
 org: harmony-labs
 default_webhook:
   url: https://discord.com/api/webhooks/1234567890/...
@@ -141,132 +345,15 @@ assignments:
   - `team`: Team name.
   - `permission`: `pull`, `push`, or `admin`.
 
-## Usage
+## Command-Line Options
 
-### Command-Line Options
-
-Run `cargo run -- --help` to see all options:
+Run `gh-config --help` to see all options:
 
 - `--config <PATH>`: Path to the YAML config file (default: `config.yaml`).
 - `--token <TOKEN>`: GitHub PAT (or set via `GITHUB_TOKEN` env var).
-- `--dry-run`: Validate changes without applying them.
+- `--dry-run`: Validate changes without applying them (used with `sync` or `sync-from-org`).
 - `--sync-from-org <ORG>`: Generate a config file from the specified GitHub org.
 - `--diff`: Show a line-numbered diff between the local config and GitHub state.
-
-### Examples
-
-1. **Apply Changes**:
-   ```
-   cargo run -- --config config.yaml --token <your-pat>
-   ```
-
-2. **Dry Run (Validation)**:
-   ```
-   RUST_LOG=info cargo run -- --config config.yaml --token <your-pat> --dry-run
-   ```
-   Output example:
-   ```
-   INFO  gh_config_cli: Running in dry-run mode; validating changes without applying.
-   INFO  gh_config_cli::github: [Dry Run] Would update harmony-labs/harmony settings: RepoSettings { allow_merge_commit: true, ... } -> RepoSettings { allow_merge_commit: false, ... }
-   ```
-
-3. **Generate Config from GitHub**:
-   ```
-   cargo run -- --config config.yaml --token <your-pat> --sync-from-org harmony-labs
-   ```
-
-4. **Show Diff**:
-   ```
-   cargo run -- --config config.yaml --token <your-pat> --diff
-   ```
-   Output example:
-   ```
-   --- GitHub
-   +++ Local
-   @@ -1,5 +1,5 @@ Hunk 1
-    org: harmony-labs
-    repos:
-    - name: harmony
-      settings:
-   -    allow_merge_commit: true
-   +    allow_merge_commit: false
-        allow_squash_merge: true
-        allow_rebase_merge: true
-   ```
-
-5. **Using Installed Binary**:
-   After `cargo install --path .`:
-   ```
-   gh-config --config config.yaml --token <your-pat> --diff
-   ```
-
-### Makefile Commands
-
-- `make build`: Build the project.
-- `make diff`: Run the diff command.
-- `make dry-run`: Run in dry-run mode.
-- `make sync`: Apply the config.
-- `make sync-from-github`: Generate config from GitHub.
-- `make list-repos`: List org repos.
-- `make help`: Show CLI help.
-
-## GitHub Actions Integration
-
-Automate validation and application with GitHub Actions. Add this workflow to `.github/workflows/validate-org.yml`:
-
-```
-name: Validate GitHub Org Config
-
-on:
-  pull_request:
-    branches: [main]
-  push:
-    branches: [main]
-
-jobs:
-  validate-config:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-      - name: Build CLI
-        run: cargo build --release
-      - name: Validate Config (Dry Run)
-        env:
-          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
-          RUST_LOG: info
-        run: ./target/release/gh-config --config config.yaml --token $GITHUB_TOKEN --dry-run
-
-  apply-config:
-    if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true
-    runs-on: ubuntu-latest
-    needs: validate-config
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-      - name: Build CLI
-        run: cargo build --release
-      - name: Apply Config
-        env:
-          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
-          RUST_LOG: info
-        run: ./target/release/gh-config --config config.yaml --token $GITHUB_TOKEN
-```
-
-### Setup
-
-1. **Store PAT in GitHub Secrets**:
-   - Go to your repository’s **Settings > Secrets and variables > Actions**.
-   - Click **New repository secret**.
-   - Name it `GH_PAT` and paste your PAT value.
-2. Push changes to a PR; the `validate-config` job runs on each commit.
-3. Merge the PR; the `apply-config` job applies the changes.
 
 ## Contributing
 
