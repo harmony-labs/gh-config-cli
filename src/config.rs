@@ -8,11 +8,19 @@ pub struct RepoSettings {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct DeployKey {
+    pub enabled: bool,
+    pub title: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Repo {
     pub name: String,
     pub settings: RepoSettings,
     #[serde(default)]
     pub visibility: Option<String>, // "public" or "private"
+    #[serde(default)]
+    pub deploy_key: Option<DeployKey>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

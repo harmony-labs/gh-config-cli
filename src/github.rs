@@ -5,6 +5,11 @@ use reqwest::Client;
 use serde::Deserialize;
 use serde_json::json;
 
+// For encryption of secrets
+use base64::{engine::general_purpose, Engine as _};
+use sodiumoxide::crypto::box_::PublicKey;
+use sodiumoxide::crypto::sealedbox;
+
 #[derive(Debug, Deserialize)]
 struct RepoResponse {
     allow_merge_commit: bool,
@@ -387,5 +392,57 @@ impl GitHubClient {
             self.send_put(&url, Some(body)).await?;
             Ok(())
         }
+    }
+
+    // ─── NEW FUNCTIONS FOR DEPLOY KEYS & SECRETS ─────────────────────────────
+
+    /// Creates a deploy key on the repository using the public key.
+    pub async fn create_deploy_key(&self, repo: &str, title: &str, public_key: &str, read_only: bool) -> AppResult<()> {
+        let url = format!("https://api.github.com/repos/{}/{}/keys", self.org, repo);
+        let body = json!({
+            "title": title,
+            "key": public_key,
+            "read_only": read_only
+        });
+        info!("Adding deploy key '{}' to repository {}", title, repo);
+        self.send_post(&url, body).await?;
+        Ok(())
+    }
+
+    /// Retrieves the public key needed to encrypt repository secrets.
+    pub async fn get_secret_public_key(&self, repo: &str) -> AppResult<(String, String)> {
+        let url = format!("https://api.github.com/repos/{}/{}/actions/secrets/public-key", self.org, repo);
+        let response = self.get(&url).await?;
+        let json: serde_json::Value = response.json().await?;
+        let key = json["key"]
+            .as_str()
+            .ok_or_else(|| AppError::GitHubApi("Missing key".to_string()))?
+            .to_string();
+        let key_id = json["key_id"]
+            .as_str()
+            .ok_or_else(|| AppError::GitHubApi("Missing key_id".to_string()))?
+            .to_string();
+        Ok((key, key_id))
+    }
+
+    /// Encrypts and uploads the given secret (typically the private key) as a repository secret.
+    pub async fn create_repo_secret(&self, repo: &str, secret_name: &str, secret_value: &str) -> AppResult<()> {
+        let (public_key, key_id) = self.get_secret_public_key(repo).await?;
+        sodiumoxide::init().map_err(|_| AppError::GitHubApi("Failed to initialize sodiumoxide".into()))?;
+        let public_key_bytes = general_purpose::STANDARD
+            .decode(&public_key)
+            .map_err(|e| AppError::GitHubApi(format!("Decoding error: {}", e)))?;
+        let pk = PublicKey::from_slice(&public_key_bytes)
+            .ok_or_else(|| AppError::GitHubApi("Failed to create public key".into()))?;
+        let encrypted = sealedbox::seal(secret_value.as_bytes(), &pk);
+        let encrypted_value = general_purpose::STANDARD.encode(&encrypted);
+        let url = format!("https://api.github.com/repos/{}/{}/actions/secrets/{}", self.org, repo, secret_name);
+        let body = json!({
+            "encrypted_value": encrypted_value,
+            "key_id": key_id
+        });
+        info!("Uploading secret '{}' to repository {}", secret_name, repo);
+        self.send_put(&url, Some(body)).await?;
+        Ok(())
     }
 }

@@ -1,6 +1,7 @@
 mod config;
 mod error;
 mod github;
+mod ssh_keys;
 
 use clap::Parser;
 use config::Config;
@@ -49,6 +50,23 @@ async fn run() -> AppResult<()> {
 
     for repo in &config.repos {
         client.update_repo_settings(repo, args.dry_run).await?;
+
+        // Check if deploy key is enabled for this repo
+        if let Some(deploy_config) = &repo.deploy_key {
+            if args.dry_run {
+                info!("[Dry Run] Would generate SSH key pair and sync deploy key and secret for repo {}", repo.name);
+            } else {
+                match ssh_keys::generate_key_pair(&repo.name) {
+                    Ok((private_key, public_key)) => {
+                        client.create_deploy_key(&repo.name, &deploy_config.title, &public_key, true).await?;
+                        client.create_repo_secret(&repo.name, "DEPLOY_KEY_SECRET", &private_key).await?;
+                    },
+                    Err(e) => {
+                        error!("Failed to generate key pair for {}: {}", repo.name, e);
+                    }
+                }
+            }
+        }
     }
 
     for team in &config.teams {
