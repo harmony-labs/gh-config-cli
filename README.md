@@ -45,6 +45,19 @@ A Rust CLI tool to manage GitHub organization settings declaratively using YAML 
 
 ## Downloading and Using Locally
 
+### Using ubi
+
+1. **Install ubi:**  
+   Ensure you have ubi installed by running:
+   ```bash
+   mkdir -p ~/.ubi/bin
+   echo '\nexport PATH="$HOME/.ubi/bin:$PATH"' >> ~/.zshrc  # or your preferred shell profile
+   ```
+2. **Install vnext with ubi:**  
+   ```bash
+   ubi --project harmony-labs/gh-config-cli --exe gh-config --in ~/.ubi/bin
+   ```
+
 ### Installation from GitHub Releases
 
 1. **Download the Binary**:
