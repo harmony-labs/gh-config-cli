@@ -1,6 +1,7 @@
 mod config;
 mod error;
 mod github;
+mod ssh_keys;
 
 use clap::{Parser, Subcommand};
 use config::Config;
@@ -52,14 +53,14 @@ enum Command {
 async fn main() {
     env_logger::init();
     match run().await {
-        Ok(false) => process::exit(0), // No diffs or successful sync/sync-from-org
+        Ok(false) => process::exit(0),
         Ok(true) => {
             info!("Exiting with code 1 due to differences found.");
-            process::exit(1); // Diffs found
+            process::exit(1)
         }
         Err(e) => {
             error!("Application error: {}", e);
-            process::exit(1); // Error occurred
+            process::exit(1)
         }
     }
 }
@@ -76,22 +77,22 @@ async fn run() -> AppResult<bool> {
     info!("Starting gh-config-cli with command: {}, config: {}", command, config_path);
 
     let mut client = match &args.command {
-        Command::SyncFromOrg { config: _, dry_run: _, org } => GitHubClient::new(&args.token, org),
+        Command::SyncFromOrg { .. } => GitHubClient::new(&args.token, org.unwrap()),
         _ => {
-            let config = Config::from_file(config_path)?;
-            GitHubClient::new(&args.token, &config.org)
+            let cfg = Config::from_file(config_path)?;
+            GitHubClient::new(&args.token, &cfg.org)
         }
     };
 
     match args.command {
-        Command::Diff { config: _ } => client.diff(config_path).await,
-        Command::Sync { config: _, dry_run } => {
+        Command::Diff { .. } => client.diff(config_path).await,
+        Command::Sync { .. } => {
             client.sync(config_path, dry_run).await?;
-            Ok(false) // Sync completed, no diffs to report
+            Ok(false)
         }
-        Command::SyncFromOrg { config: _, dry_run, org: _ } => {
+        Command::SyncFromOrg { .. } => {
             client.generate_config_and_write(config_path, dry_run).await?;
-            Ok(false) // Sync-from-org completed, no diffs to report
+            Ok(false)
         }
     }
 }

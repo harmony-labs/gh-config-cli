@@ -14,7 +14,14 @@ pub struct RepoSettings {
     pub allow_rebase_merge: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)] // Added Clone
+// New struct for deploy key configuration.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct DeployKey {
+    pub enabled: bool,
+    pub title: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Repo {
     pub name: String,
     pub settings: RepoSettings,
@@ -22,21 +29,24 @@ pub struct Repo {
     pub visibility: Option<String>, // "public" or "private"
     #[serde(default)]
     pub webhook: Option<WebhookConfig>,
+    // New optional deploy key configuration.
+    #[serde(default)]
+    pub deploy_key: Option<DeployKey>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)] // Added Clone
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Team {
     pub name: String,
     pub members: Vec<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)] // Added Clone
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct User {
     pub login: String,
     pub role: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)] // Added Clone
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Assignment {
     pub repo: String,
     pub team: String,
