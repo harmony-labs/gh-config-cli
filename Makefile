@@ -26,3 +26,6 @@ sync:
 
 sync-from-github:
 	@GITHUB_TOKEN=$(GITHUB_TOKEN) RUST_LOG=$(RUST_LOG) cargo run -- sync-from-org $(CONFIG_FILE) --org $(GITHUB_ORG)
+
+test:
+	cargo test

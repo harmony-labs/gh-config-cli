@@ -21,3 +21,7 @@ serde_yaml = "0.9"
 similar = "2.6"
 thiserror = "1.0"
 tokio = { version = "1.37", features = ["full"] }
+
+[dev-dependencies]
+mockito = "1.7.0"
+tempfile = "3.19.1"

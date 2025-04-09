@@ -524,6 +524,7 @@ impl GitHubClient {
                 settings,
                 visibility,
                 webhook,
+                branch_protections: vec![],
             });
         }
 
@@ -592,6 +593,7 @@ impl GitHubClient {
             users,
             assignments,
             default_webhook,
+            default_branch_protections: vec![],
         })
     }
 
@@ -830,5 +832,66 @@ impl GitHubClient {
             }
         }
         Ok(has_diffs)
+    }
+}
+
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use mockito;
+    use tokio;
+
+    #[tokio::test]
+    async fn test_github_client_new() {
+        let client = GitHubClient::new("dummy_token", "dummy_org");
+        assert_eq!(client.token, "dummy_token");
+        assert_eq!(client.org, "dummy_org");
+    }
+
+    #[test]
+    fn test_get_webhooks_parses_response() {
+        let mut server = mockito::Server::new();
+
+        let _m = server
+            .mock("GET", "/repos/dummy_org/dummy_repo/hooks")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                r#"
+[
+  {
+    "id": 123,
+    "url": "http://api.github.com/hook/123",
+    "config": {
+      "url": "http://example.com",
+      "content_type": "json"
+    },
+    "events": ["push", "pull_request"]
+  }
+]
+"#,
+            )
+            .create();
+
+        let rt = tokio::runtime::Runtime::new().expect("create runtime");
+        rt.block_on(async {
+            let mut client = GitHubClient::new("dummy_token", "dummy_org");
+            client.org = "dummy_org".to_string();
+
+            let url = format!("{}/repos/dummy_org/dummy_repo/hooks", server.url());
+            let response = client.get(&url).await.expect("HTTP GET failed");
+            let text = response.text().await.expect("read response text");
+            let hooks: Vec<WebhookResponse> = serde_json::from_str(&text).expect("parse JSON");
+
+            assert_eq!(hooks.len(), 1);
+            let hook = &hooks[0];
+            assert_eq!(hook.id, Some(123));
+            assert_eq!(hook.url, "http://api.github.com/hook/123");
+            assert_eq!(hook.config.url, "http://example.com");
+            assert_eq!(hook.config.content_type, "json");
+            assert_eq!(hook.events, vec!["push", "pull_request"]);
+        });
     }
 }

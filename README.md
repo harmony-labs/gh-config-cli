@@ -358,6 +358,50 @@ assignments:
   - `team`: Team name.
   - `permission`: `pull`, `push`, or `admin`.
 
+### Branch Protection Rules
+
+You can enforce branch protection rules across your repositories declaratively.
+
+- **`default_branch_protections`**: A list of branch protection rules applied by default to all repositories matching the branch pattern (e.g., `main`).
+- **`branch_protections`** (per repo): Additional or overriding rules specific to that repository.
+
+Each rule supports:
+
+| Field             | Description                                                      | Example             |
+|-------------------|------------------------------------------------------------------|---------------------|
+| `pattern`         | Branch name or glob pattern                                      | `main`, `release/*` |
+| `enforce_admins`  | Whether admins are subject to protection rules                   | `true`              |
+| `allow_deletions` | Whether the branch can be deleted                                | `false`             |
+| `allow_force_pushes` | Whether force pushes are allowed                              | `false`             |
+
+#### Example
+
+```yaml
+org: my-org
+
+default_branch_protections:
+  - pattern: main
+    enforce_admins: true
+    allow_deletions: false
+    allow_force_pushes: false
+
+repos:
+  - name: repo1
+    # inherits default protection for 'main'
+    settings:
+      allow_merge_commit: true
+      allow_squash_merge: true
+      allow_rebase_merge: true
+
+  - name: repo2
+    branch_protections:
+      - pattern: develop
+        enforce_admins: true
+        allow_deletions: false
+        allow_force_pushes: false
+    # applies default to 'main' and custom to 'develop'
+```
+
 ## Command-Line Options
 
 Run `gh-config --help` to see all options:
