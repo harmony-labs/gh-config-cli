@@ -2,6 +2,11 @@
 name = "gh-config-cli"
 version = "0.1.0"
 edition = "2021"
+repository = "https://github.com/harmony-labs/contree-cli"
+homepage = "https://github.com/harmony-labs/contree-cli"
+documentation = "https://docs.rs/contree"
+keywords = ["cli", "context", "ai", "rust", "project", "tool"]
+authors = ["@mateodelnorte"]
 
 [[bin]]
 name = "gh-config"
