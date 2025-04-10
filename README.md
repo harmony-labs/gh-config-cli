@@ -21,7 +21,8 @@ A fast, declarative CLI tool to manage GitHub organization configuration as code
 - [Security Considerations](#security-considerations)
 - [Contributing](#contributing)
 - [License](#license)
-
+- [Documentation](#documentation)
+- [Getting Help](#getting-help)
 ---
 
 ## Features
@@ -249,10 +250,11 @@ make sync-from-github CONFIG_FILE=config.yaml GITHUB_ORG=harmony-labs
 ---
 
 ## Contributing
-
 - Issues and PRs welcome!
 - Please file bugs, suggest features, or contribute code.
-- See [CONTRIBUTING.md](CONTRIBUTING.md) if available.
+- See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+- Please read and follow our [Code of Conduct](CODE_OF_CONDUCT.md).
+
 
 ---
 
@@ -265,5 +267,14 @@ MIT License. See [LICENSE](LICENSE) for details.
 - [Creating a GitHub Personal Access Token (PAT)](docs/pat-setup.md)
 - [Usage Guide](docs/usage.md)
 - [GitHub Actions CI Examples](docs/ci-examples.md)
+- [Development Guide](docs/development.md)
+- [Architecture Overview](docs/architecture.md)
+- [FAQ](docs/faq.md)
+- [Changelog](docs/changelog.md)
 
 More detailed guides and examples can be found in the `docs/` directory.
+
+## Getting Help
+
+- See the [FAQ](docs/faq.md) for common questions.
+- Open an issue on [GitHub](https://github.com/harmony-labs/gh-config-cli/issues).
