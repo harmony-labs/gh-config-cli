@@ -2,13 +2,20 @@ name: On Version Tagged, Build and Publish Rust Binaries
 on:
   push:
     tags:
-    - "v*.*.*"
+      - "v*.*.*"
 
 permissions:
   contents: write
 
 jobs:
   release:
-    uses: harmony-labs/workflow-rust-release/.github/workflows/workflow.yaml@v1.0.0
+    uses: harmony-labs/workflow-rust-release/.github/workflows/workflow.yaml@main
     with:
-      executable_name: "gh-config"
+      binary_name: gh-config
+      crate_name: gh-config-cli
+      homebrew_tap: harmony-labs/homebrew-tap
+      scoop_bucket: harmony-labs/scoop-bucket
+    secrets:
+      CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+      HOMEBREW_GITHUB_TOKEN: ${{ secrets.HOMEBREW_GITHUB_TOKEN }}
+      SCOOP_GITHUB_TOKEN: ${{ secrets.SCOOP_GITHUB_TOKEN }}
