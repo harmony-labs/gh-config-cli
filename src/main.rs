@@ -1,6 +1,8 @@
 mod config;
 mod error;
 mod github;
+mod api_mapping;
+mod api_mapping_generated;
 
 use clap::{Parser, Subcommand};
 use config::Config;
@@ -78,7 +80,7 @@ async fn run() -> AppResult<bool> {
     let mut client = match &args.command {
         Command::SyncFromOrg { config: _, dry_run: _, org } => GitHubClient::new(&args.token, org),
         _ => {
-            let config = Config::from_file(config_path)?;
+            let config = Config::from_file_with_defaults(config_path, None)?;
             GitHubClient::new(&args.token, &config.org)
         }
     };

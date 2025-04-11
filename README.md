@@ -129,20 +129,19 @@ gh-config --token <your-pat> sync-from-org config.yaml --org harmony-labs
 
 ## Configuration
 
-Define your org in a YAML file, e.g., `config.yaml`:
+gh-config uses a fully extensible, declarative YAML schema. You can specify any settings supported by the GitHub API, as well as custom fields for automation and policy.
 
+**Example `config.yaml`:**
 ```yaml
 org: harmony-labs
-default_webhook:
-  url: https://discord.com/api/webhooks/...
-  content_type: json
-  events: [push, pull_request]
 repos:
   - name: harmony
     settings:
       allow_merge_commit: false
       allow_squash_merge: true
       allow_rebase_merge: true
+      # Any other GitHub repo setting or custom field
+      custom_policy: "enforced"
 teams:
   - name: core-team
     members:
@@ -157,14 +156,41 @@ assignments:
     permission: push
 ```
 
-Supports:
+### Defaults and Merging
 
+You can provide a `defaults.config.yaml` file to specify org-wide or policy defaults. All fields are optional. The main config takes precedence over defaults.
+
+**Example `defaults.config.yaml`:**
+```yaml
+repos:
+  - settings:
+      allow_merge_commit: true
+      custom_policy: "default"
+default_webhook:
+  url: https://discord.com/api/webhooks/...
+  content_type: json
+  events: [push, pull_request]
+default_branch_protections:
+  - pattern: main
+    enforce_admins: true
+    allow_deletions: false
+    allow_force_pushes: false
+```
+
+**Merging rules:**
+- If a setting exists in both main config and defaults, main config wins.
+- If a setting exists only in defaults, it is used unless overridden.
+- Custom fields are supported for automation/policy.
+
+**Supports:**
+- All GitHub API-manageable settings (see [GitHub REST API docs](https://docs.github.com/en/rest?apiVersion=2022-11-28))
 - Org-wide default webhooks
-- Repo settings (merge options, visibility, webhooks)
+- Repo settings (merge options, visibility, webhooks, etc.)
 - Teams and members
 - User roles
 - Team-repo permissions
-- Branch protection rules (see full schema in docs)
+- Branch protection rules
+- Custom org-wide or policy fields for automation
 
 ---
 

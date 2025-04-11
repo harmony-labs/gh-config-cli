@@ -12,6 +12,10 @@ authors = ["@mateodelnorte"]
 name = "gh-config"
 path = "src/main.rs"
 
+[[bin]]
+name = "generate_api_mapping"
+path = "scripts/generate_api_mapping.rs"
+
 [dependencies]
 anyhow = "1.0"
 clap = { version = "4.5", features = ["derive", "env"] }

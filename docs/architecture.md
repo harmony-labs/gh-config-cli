@@ -61,4 +61,26 @@ gh-config-cli/
 - Run all tests with `cargo test`.
 
 ---
+## Data-Driven API Mapping Layer
+
+To support all possible configurable settings in the GitHub API, gh-config uses a data-driven API mapping table (see `src/api_mapping.rs`). This table describes, for each config field:
+
+- The resource type (e.g., repo, org, team)
+- The config key (e.g., `allow_merge_commit`)
+- The corresponding GitHub API endpoint (with placeholders for variables)
+- The HTTP method (PATCH, PUT, etc.)
+- The JSON path for the field in the API payload
+
+The CLI uses this mapping to dynamically build and send API requests for any supported field. This enables:
+
+- Extensible support for new GitHub settings without hardcoding logic for each field
+- Easy addition of new fields/endpoints by updating the mapping table
+- The potential for automated mapping generation from the GitHub OpenAPI spec
+
+**Extending the mapping:**
+- To add support for a new field, add an entry to the mapping table with the correct endpoint, method, and JSON path.
+- In the future, the mapping may be moved to an external YAML/JSON file for easier updates and automation.
+
+This approach ensures gh-config can keep pace with changes in the GitHub API and declaratively manage all supported settings.
+
 For more details, see the source code and inline documentation.

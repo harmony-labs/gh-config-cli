@@ -8,6 +8,9 @@ RUST_LOG ?= info
 build:
 	@cargo build
 
+clean:
+	cargo clean
+
 diff:
 	@GITHUB_TOKEN=$(GITHUB_TOKEN) RUST_LOG=$(RUST_LOG) cargo run -- diff $(CONFIG_FILE)
 
@@ -16,6 +19,9 @@ dry-run:
 
 help:
 	@cargo run -- --help
+
+install:
+	cargo install --path .
 
 list-repos:
 	@curl -s -H "Authorization: Bearer $(GITHUB_TOKEN)" \
@@ -29,3 +35,9 @@ sync-from-github:
 
 test:
 	cargo test
+
+# Update the API mapping table from the latest GitHub OpenAPI spec
+update-github-api-mappings:
+	curl -L -o github-openapi.json https://raw.githubusercontent.com/github/rest-api-description/main/descriptions/api.github.com/api.github.com.json
+	cargo run --bin generate_api_mapping -- github-openapi.json > src/api_mapping_generated.rs
+	@echo "Generated mapping table in src/api_mapping_generated.rs. Integrate as needed."
