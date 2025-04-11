@@ -1,4 +1,6 @@
 use crate::config::{Assignment, Repo, RepoSettings, Team, User, WebhookConfig, Config};
+use crate::api_mapping::ApiFieldMapping;
+use crate::api_mapping_generated::get_github_api_mapping;
 use crate::error::{AppError, AppResult};
 use colored::*;
 use log::{debug, info, error};
@@ -150,6 +152,7 @@ impl GitHubClient {
         }
     }
 
+    /// Fetch all settings for a repo as a HashMap<String, serde_yaml::Value>
     async fn get_repo_settings(&self, repo_name: &str) -> AppResult<RepoSettings> {
         let url = format!("https://api.github.com/repos/{}/{}", self.org, repo_name);
         let response = self.get(&url).await?;
@@ -159,15 +162,21 @@ impl GitHubClient {
             return Err(AppError::GitHubApi("Empty response body".to_string()));
         }
         debug!("Raw response for {}: {}", url, text);
-        let repo: RepoResponse = serde_json::from_str(&text)
+        let repo_json: serde_json::Value = serde_json::from_str(&text)
             .map_err(|e| AppError::GitHubApi(format!("Failed to parse response from {}: {}", url, e)))?;
-        debug!("Repo {} parsed settings: allow_merge_commit={}, allow_squash_merge={}, allow_rebase_merge={}", 
-            repo_name, repo.allow_merge_commit, repo.allow_squash_merge, repo.allow_rebase_merge);
-        Ok(RepoSettings {
-            allow_merge_commit: repo.allow_merge_commit,
-            allow_squash_merge: repo.allow_squash_merge,
-            allow_rebase_merge: repo.allow_rebase_merge,
-        })
+        // Convert to serde_yaml::Value for consistency with config
+        let repo_yaml: serde_yaml::Value = serde_yaml::to_value(repo_json)
+            .map_err(|e| AppError::GitHubApi(format!("Failed to convert repo JSON to YAML: {}", e)))?;
+        // Flatten to a HashMap<String, Value>
+        let mut settings = RepoSettings::new();
+        if let serde_yaml::Value::Mapping(map) = repo_yaml {
+            for (k, v) in map {
+                if let serde_yaml::Value::String(key) = k {
+                    settings.insert(key, v);
+                }
+            }
+        }
+        Ok(settings)
     }
 
     async fn get_repo_visibility(&self, repo_name: &str) -> AppResult<String> {
@@ -258,7 +267,7 @@ impl GitHubClient {
         self.send_post(&url, body).await?;
         Ok(())
     }
-    
+
     async fn update_webhook(&self, repo_name: &str, hook_id: i64, webhook: &WebhookConfig) -> AppResult<()> {
         let url = format!("https://api.github.com/repos/{}/{}/hooks/{}", self.org, repo_name, hook_id);
         let body = json!({
@@ -306,47 +315,49 @@ impl GitHubClient {
         Ok(())
     }
 
+    /// Update repo settings: use generated mapping table to PATCH only keys that differ, to correct endpoint
     pub async fn update_repo_settings(&self, repo: &Repo, dry_run: bool) -> AppResult<()> {
         let current = self.get_repo_settings(&repo.name).await?;
         let desired = &repo.settings;
-        let current_visibility = self.get_repo_visibility(&repo.name).await?;
-        let desired_visibility = repo.visibility.as_deref().unwrap_or("private");
+        let mapping = get_github_api_mapping();
 
-        if dry_run {
-            if current.allow_merge_commit != desired.allow_merge_commit
-                || current.allow_squash_merge != desired.allow_squash_merge
-                || current.allow_rebase_merge != desired.allow_rebase_merge
-            {
-                info!(
-                    "[Dry Run] Would update {}/{} settings: {:?} -> {:?}",
-                    self.org, repo.name, current, desired
-                );
-            }
-            if current_visibility != desired_visibility {
-                info!(
-                    "[Dry Run] Would update {}/{} visibility: {} -> {}",
-                    self.org, repo.name, current_visibility, desired_visibility
-                );
-            }
-        } else {
-            if current.allow_merge_commit != desired.allow_merge_commit
-                || current.allow_squash_merge != desired.allow_squash_merge
-                || current.allow_rebase_merge != desired.allow_rebase_merge
-                || current_visibility != desired_visibility
-            {
-                let url = format!("https://api.github.com/repos/{}/{}", self.org, repo.name);
-                let body = json!({
-                    "allow_merge_commit": repo.settings.allow_merge_commit,
-                    "allow_squash_merge": repo.settings.allow_squash_merge,
-                    "allow_rebase_merge": repo.settings.allow_rebase_merge,
-                    "private": repo.visibility.as_deref() != Some("public")
-                });
-                info!("Updating settings for {}/{}", self.org, repo.name);
-                self.send_patch(&url, body).await?;
+        // For each mapped field, if it differs, PATCH to the correct endpoint
+        for (k, v_desired) in desired.iter() {
+            if let Some(field_map) = mapping.get(k.as_str()) {
+                let v_current = current.get(k);
+                if v_current != Some(v_desired) {
+                    // Build PATCH payload
+                    let mut patch_body = serde_json::Map::new();
+                    patch_body.insert(field_map.json_path.to_string(), serde_json::to_value(v_desired).unwrap_or(serde_json::Value::Null));
+                    let url = field_map.endpoint
+                        .replace("{org}", &self.org)
+                        .replace("{repo}", &repo.name);
+                    let body = serde_json::Value::Object(patch_body);
+
+                    if dry_run {
+                        info!(
+                            "[Dry Run] Would {} {} with body: {:?}",
+                            field_map.method, url, body
+                        );
+                    } else {
+                        info!("{} {} with body: {:?}", field_map.method, url, body);
+                        match field_map.method {
+                            "PATCH" => self.send_patch(&url, body).await?,
+                            "PUT" => self.send_put(&url, Some(body)).await?,
+                            "POST" => self.send_post(&url, body).await?,
+                            _ => error!("Unsupported HTTP method: {}", field_map.method),
+                        }
+                    }
+                }
+            } else {
+                debug!("No API mapping for repo setting '{}', skipping.", k);
             }
         }
 
-        self.manage_webhooks(&repo.name, repo.webhook.as_ref().unwrap(), dry_run).await?;
+        // Webhook management remains as before
+        if let Some(webhook) = repo.webhook.as_ref() {
+            self.manage_webhooks(&repo.name, webhook, dry_run).await?;
+        }
         Ok(())
     }
 
@@ -507,7 +518,7 @@ impl GitHubClient {
         let repo_response = self.get(&repo_url).await?;
         let repo_json: Vec<serde_json::Value> = repo_response.json().await
             .map_err(|e| AppError::Http(e))?;
-        
+
         for repo in repo_json {
             let name = repo["name"].as_str().ok_or_else(|| AppError::GitHubApi("Missing repo name".to_string()))?.to_string();
             let settings = self.get_repo_settings(&name).await?; // Use individual repo endpoint
@@ -525,6 +536,7 @@ impl GitHubClient {
                 visibility,
                 webhook,
                 branch_protections: vec![],
+                extra: std::collections::HashMap::new(),
             });
         }
 
@@ -533,7 +545,7 @@ impl GitHubClient {
         let team_response = self.get(&team_url).await?;
         let team_json: Vec<serde_json::Value> = team_response.json().await
             .map_err(|e| AppError::Http(e))?;
-        
+
         for team in team_json {
             let name = team["name"].as_str().ok_or_else(|| AppError::GitHubApi("Missing team name".to_string()))?.to_string();
             let members_url = format!("https://api.github.com/orgs/{}/teams/{}/members?per_page=100", self.org, name);
@@ -553,7 +565,7 @@ impl GitHubClient {
         let members_response = self.get(&members_url).await?;
         let members_json: Vec<serde_json::Value> = members_response.json().await
             .map_err(|e| AppError::Http(e))?;
-        
+
         for member in members_json {
             let login = member["login"].as_str().ok_or_else(|| AppError::GitHubApi("Missing member login".to_string()))?.to_string();
             let role_response = self.get_user_membership(&login).await?;
@@ -594,6 +606,7 @@ impl GitHubClient {
             assignments,
             default_webhook,
             default_branch_protections: vec![],
+            extra: std::collections::HashMap::new(),
         })
     }
 
@@ -639,9 +652,12 @@ impl GitHubClient {
             for repo in &repos {
                 yaml_content.push_str(&format!("- name: {}\n", repo.name));
                 yaml_content.push_str("  settings:\n");
-                yaml_content.push_str(&format!("    allow_merge_commit: {}\n", repo.settings.allow_merge_commit));
-                yaml_content.push_str(&format!("    allow_squash_merge: {}\n", repo.settings.allow_squash_merge));
-                yaml_content.push_str(&format!("    allow_rebase_merge: {}\n", repo.settings.allow_rebase_merge));
+                let amc = repo.settings.get("allow_merge_commit").map(|v| v.as_bool().unwrap_or(false)).unwrap_or(false);
+                let asm = repo.settings.get("allow_squash_merge").map(|v| v.as_bool().unwrap_or(false)).unwrap_or(false);
+                let arm = repo.settings.get("allow_rebase_merge").map(|v| v.as_bool().unwrap_or(false)).unwrap_or(false);
+                yaml_content.push_str(&format!("    allow_merge_commit: {}\n", amc));
+                yaml_content.push_str(&format!("    allow_squash_merge: {}\n", asm));
+                yaml_content.push_str(&format!("    allow_rebase_merge: {}\n", arm));
                 if let Some(visibility) = &repo.visibility {
                     yaml_content.push_str(&format!("  visibility: {}\n", visibility));
                 }
@@ -702,7 +718,7 @@ impl GitHubClient {
     }
 
     pub async fn sync(&mut self, config_path: &str, dry_run: bool) -> AppResult<()> {
-        let config = Config::from_file(config_path)?;
+        let config = crate::config::Config::from_file_with_defaults(config_path, None)?;
         self.org = config.org.clone();
 
         if dry_run {
@@ -761,7 +777,7 @@ impl GitHubClient {
         let mut github_config = self.generate_config_from_org().await?;
 
         // Load and consolidate local config (apply default_webhook to repos)
-        let mut local_config = Config::from_file(config_path)?;
+        let mut local_config = crate::config::Config::from_file_with_defaults(config_path, None)?;
         if let Some(default_webhook) = &local_config.default_webhook {
             for repo in &mut local_config.repos {
                 if repo.webhook.is_none() {

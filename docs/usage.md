@@ -33,6 +33,59 @@ GITHUB_TOKEN=<your-pat> gh-config diff config.yaml
 
 ---
 
+## Extensible Schema and Advanced Usage
+
+gh-config now supports a fully extensible configuration schema. You can declaratively manage any setting supported by the GitHub API—just add the field to your config using the correct config key.
+
+### Adding New Repo Settings
+
+You can add any supported repo setting under `settings:` for each repo:
+
+```yaml
+repos:
+  - name: my-repo
+    settings:
+      allow_merge_commit: false
+      allow_squash_merge: true
+      allow_rebase_merge: true
+      delete_branch_on_merge: true   # New field, just add it!
+      has_issues: true               # Another new field
+    visibility: public
+```
+
+### Org-Level and Team-Level Settings
+
+You can add org-level or team-level settings using the config key as defined in the GitHub API:
+
+```yaml
+org: harmony-labs
+org_settings:
+  billing_email: "admin@harmony.com"
+  default_repository_permission: "read"
+  members_can_create_repositories: false
+
+teams:
+  - name: core-team
+    members:
+      - alice
+      - bob
+    privacy: closed   # Example team setting
+```
+
+### How It Works
+
+- The tool uses a mapping generated from the GitHub OpenAPI spec to translate config keys to API endpoints and payloads.
+- To add a new setting, just add the field to your config. If it's supported by the GitHub API and present in the mapping, it will be managed automatically.
+- To update the mapping, run `make update-github-api-mappings` to fetch the latest API spec and regenerate the mapping.
+
+### Troubleshooting
+
+- If a field is not applied, check that the config key matches the GitHub API field name.
+- If a field is not present in the mapping, update the mapping as described above.
+- For advanced troubleshooting, see [Architecture Overview](./architecture.md).
+
+---
+
 ### 2. Apply Changes (Sync)
 
 Apply your local config to GitHub, creating/updating repos, teams, permissions, etc.
@@ -104,3 +157,4 @@ to see all available options and commands.
 - [Creating a PAT](./pat-setup.md)
 - [GitHub Actions examples](./ci-examples.md)
 - [Configuration schema](../README.md#configuration)
+- [Architecture Overview](./architecture.md)
