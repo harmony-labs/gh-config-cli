@@ -67,12 +67,13 @@ pub struct WebhookConfigResponse {
     content_type: String,
 }
 
-/**
- * GitHub API client for organization-level operations.
- *
- * This struct provides methods to interact with the GitHub REST API, including repository, team,
- * user, and webhook management. All requests are authenticated using a personal access token.
- */
+///
+/// Client for interacting with the GitHub API for organization management.
+///
+/// The `GitHubClient` provides methods to manage repositories, teams, users, webhooks,
+/// and configuration synchronization for a GitHub organization. It handles authentication,
+/// API requests, and high-level orchestration of organization state.
+///
 pub struct GitHubClient {
     /// Reqwest HTTP client for making API requests.
     client: Client,
@@ -267,16 +268,16 @@ impl GitHubClient {
         Ok(repos)
     }
 
-    /**
-     * Retrieve all webhooks configured for a given repository.
-     *
-     * # Arguments
-     * * `repo_name` - The name of the repository.
-     *
-     * # Returns
-     * * `Ok(Vec<WebhookResponse>)` containing all webhooks for the repository.
-     * * `Err(AppError)` if the API call or deserialization fails.
-     */
+    ///
+    /// Retrieve all webhooks configured for a given repository.
+    ///
+    /// # Arguments
+    /// * `repo_name` - The name of the repository.
+    ///
+    /// # Returns
+    /// * `Ok(Vec<WebhookResponse>)` containing the list of webhooks if successful.
+    /// * `Err(AppError)` if the API call or parsing fails.
+    ///
     pub async fn get_webhooks(&self, repo_name: &str) -> AppResult<Vec<WebhookResponse>> {
         let url = format!("https://api.github.com/repos/{}/{}/hooks", self.org, repo_name);
         let response = self.get(&url).await?;
@@ -351,27 +352,27 @@ impl GitHubClient {
         Ok(())
     }
 
-    /**
-     * Update repository settings on GitHub to match the desired configuration.
-     *
-     * This method compares the current repository settings with the desired settings and applies only the
-     * necessary changes using the appropriate GitHub API endpoints. The mapping table determines which
-     * settings correspond to which API endpoints and JSON fields.
-     *
-     * # Arguments
-     * * `repo` - The repository whose settings should be updated.
-     * * `dry_run` - If true, no changes are made; actions are logged for preview.
-     *
-     * # Returns
-     * * `Ok(())` if all updates succeed or are skipped in dry-run mode.
-     * * `Err(AppError)` if any API call fails.
-     *
-     * # Behavior
-     * - Only settings that differ from the current state are updated.
-     * - Supports PATCH, PUT, and POST methods as defined in the mapping.
-     * - Logs actions in dry-run mode instead of performing them.
-     * - Also manages webhooks if defined in the repo configuration.
-     */
+    ///
+    /// Update repository settings on GitHub to match the desired configuration.
+    ///
+    /// This method compares the current repository settings with the desired settings and applies only the
+    /// necessary changes using the appropriate GitHub API endpoints. The mapping table determines which
+    /// settings correspond to which API endpoints and JSON fields.
+    ///
+    /// # Arguments
+    /// * `repo` - The repository whose settings should be updated.
+    /// * `dry_run` - If true, no changes are made; actions are logged for preview.
+    ///
+    /// # Returns
+    /// * `Ok(())` if all updates succeed or are skipped in dry-run mode.
+    /// * `Err(AppError)` if any API call fails.
+    ///
+    /// # Behavior
+    /// - Only settings that differ from the current state are updated.
+    /// - Supports PATCH, PUT, and POST methods as defined in the mapping.
+    /// - Logs actions in dry-run mode instead of performing them.
+    /// - Also manages webhooks if defined in the repo configuration.
+    ///
     pub async fn update_repo_settings(&self, repo: &Repo, dry_run: bool) -> AppResult<()> {
         let current = self.get_repo_settings(&repo.name).await?;
         let desired = &repo.settings;
@@ -423,6 +424,19 @@ impl GitHubClient {
         Ok(())
     }
 
+    ///
+    /// Create a team in the GitHub organization and add members.
+    ///
+    /// If the team already exists, ensures all specified members are present.
+    ///
+    /// # Arguments
+    /// * `team` - The team to create or update.
+    /// * `dry_run` - If true, no changes are made; actions are logged for preview.
+    ///
+    /// # Returns
+    /// * `Ok(())` if the team is created/updated successfully or in dry-run mode.
+    /// * `Err(AppError)` if any API call fails.
+    ///
     pub async fn create_team(&self, team: &Team, dry_run: bool) -> AppResult<()> {
         let existing = self.get_team(&team.name).await?;
         if dry_run {
@@ -473,6 +487,19 @@ impl GitHubClient {
         }
     }
 
+    ///
+    /// Add a user to the GitHub organization or update their role.
+    ///
+    /// If the user is already a member, updates their role if necessary.
+    ///
+    /// # Arguments
+    /// * `user` - The user to add or update.
+    /// * `dry_run` - If true, no changes are made; actions are logged for preview.
+    ///
+    /// # Returns
+    /// * `Ok(())` if the user is added/updated successfully or in dry-run mode.
+    /// * `Err(AppError)` if any API call fails.
+    ///
     pub async fn add_user_to_org(&self, user: &User, dry_run: bool) -> AppResult<()> {
         if dry_run {
             let current_role = self.get_user_membership(&user.login).await?;
@@ -503,6 +530,19 @@ impl GitHubClient {
         }
     }
 
+    ///
+    /// Assign a team to a repository with a specific permission level.
+    ///
+    /// If the team already has a different permission, updates it.
+    ///
+    /// # Arguments
+    /// * `assignment` - The assignment specifying team, repo, and permission.
+    /// * `dry_run` - If true, no changes are made; actions are logged for preview.
+    ///
+    /// # Returns
+    /// * `Ok(())` if the assignment is applied successfully or in dry-run mode.
+    /// * `Err(AppError)` if any API call fails.
+    ///
     pub async fn assign_team_to_repo(&self, assignment: &Assignment, dry_run: bool) -> AppResult<()> {
         if dry_run {
             let current_perm = self
