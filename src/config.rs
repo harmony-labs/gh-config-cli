@@ -1,25 +1,46 @@
+/*!
+    Configuration models for gh-config-cli.
+
+    This module defines the data structures used for representing repository, team, user, and webhook
+    configuration. All structs are serializable/deserializable for use with YAML and JSON configuration files.
+*/
+
 use serde::{Deserialize, Serialize};
 
 use serde_yaml::Value;
 use std::collections::HashMap;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+/**
+ * Configuration for a GitHub webhook.
+ */
 pub struct WebhookConfig {
+    /// The webhook endpoint URL.
     pub url: String,
+    /// The content type for webhook payloads (e.g., "json").
     pub content_type: String,
+    /// List of events that trigger the webhook.
     pub events: Vec<String>,
 }
 
 // Extensible settings: arbitrary key-value pairs for repo settings
+/// Arbitrary key-value pairs for repository settings (extensible).
 pub type RepoSettings = HashMap<String, Value>;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+/**
+ * Branch protection rule for a repository.
+ */
 pub struct BranchProtectionRule {
-    pub pattern: String, // branch name or glob
+    /// Branch name or glob pattern to match.
+    pub pattern: String,
+    /// Whether to enforce admin restrictions.
     #[serde(default)]
     pub enforce_admins: bool,
+    /// Whether to allow branch deletions.
     #[serde(default)]
     pub allow_deletions: bool,
+    /// Whether to allow force pushes.
     #[serde(default)]
     pub allow_force_pushes: bool,
 }
@@ -36,7 +57,11 @@ impl Default for BranchProtectionRule {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+/**
+ * Repository configuration.
+ */
 pub struct Repo {
+    /// Name of the repository.
     pub name: String,
     #[serde(default)]
     pub settings: RepoSettings, // Now extensible

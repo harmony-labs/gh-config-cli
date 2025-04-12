@@ -1,3 +1,14 @@
+/*!
+    GitHub API client module.
+
+    This module provides the `GitHubClient` struct and related types for interacting with the GitHub REST API.
+    It supports operations such as updating repository settings, managing teams, users, and webhooks, and
+    generating configuration from a GitHub organization. All API interactions are authenticated and support
+    dry-run mode for previewing changes.
+
+    Public APIs are documented for maintainability. Internal response structs are used for deserialization.
+*/
+
 use crate::config::{Assignment, Repo, RepoSettings, Team, User, WebhookConfig, Config};
 use crate::api_mapping_generated::get_github_api_mapping;
 use crate::error::{AppError, AppResult};
@@ -56,13 +67,27 @@ pub struct WebhookConfigResponse {
     content_type: String,
 }
 
+/**
+ * GitHub API client for organization-level operations.
+ *
+ * This struct provides methods to interact with the GitHub REST API, including repository, team,
+ * user, and webhook management. All requests are authenticated using a personal access token.
+ */
 pub struct GitHubClient {
+    /// Reqwest HTTP client for making API requests.
     client: Client,
+    /// GitHub personal access token for authentication.
     token: String,
+    /// Name of the GitHub organization to operate on.
     pub org: String,
 }
 
 impl GitHubClient {
+    /// Create a new GitHubClient for the given organization and token.
+    ///
+    /// # Arguments
+    /// * `token` - GitHub personal access token.
+    /// * `org` - Name of the GitHub organization.
     pub fn new(token: &str, org: &str) -> Self {
         GitHubClient {
             client: Client::new(),
@@ -242,6 +267,16 @@ impl GitHubClient {
         Ok(repos)
     }
 
+    /**
+     * Retrieve all webhooks configured for a given repository.
+     *
+     * # Arguments
+     * * `repo_name` - The name of the repository.
+     *
+     * # Returns
+     * * `Ok(Vec<WebhookResponse>)` containing all webhooks for the repository.
+     * * `Err(AppError)` if the API call or deserialization fails.
+     */
     pub async fn get_webhooks(&self, repo_name: &str) -> AppResult<Vec<WebhookResponse>> {
         let url = format!("https://api.github.com/repos/{}/{}/hooks", self.org, repo_name);
         let response = self.get(&url).await?;
@@ -316,26 +351,51 @@ impl GitHubClient {
         Ok(())
     }
 
-    /// Update repo settings: use generated mapping table to PATCH only keys that differ, to correct endpoint
+    /**
+     * Update repository settings on GitHub to match the desired configuration.
+     *
+     * This method compares the current repository settings with the desired settings and applies only the
+     * necessary changes using the appropriate GitHub API endpoints. The mapping table determines which
+     * settings correspond to which API endpoints and JSON fields.
+     *
+     * # Arguments
+     * * `repo` - The repository whose settings should be updated.
+     * * `dry_run` - If true, no changes are made; actions are logged for preview.
+     *
+     * # Returns
+     * * `Ok(())` if all updates succeed or are skipped in dry-run mode.
+     * * `Err(AppError)` if any API call fails.
+     *
+     * # Behavior
+     * - Only settings that differ from the current state are updated.
+     * - Supports PATCH, PUT, and POST methods as defined in the mapping.
+     * - Logs actions in dry-run mode instead of performing them.
+     * - Also manages webhooks if defined in the repo configuration.
+     */
     pub async fn update_repo_settings(&self, repo: &Repo, dry_run: bool) -> AppResult<()> {
         let current = self.get_repo_settings(&repo.name).await?;
         let desired = &repo.settings;
         let mapping = get_github_api_mapping();
 
-        // For each mapped field, if it differs, PATCH to the correct endpoint
+        // For each mapped field, if it differs from the current value, send a PATCH/PUT/POST to the correct endpoint.
         for (k, v_desired) in desired.iter() {
             if let Some(field_map) = mapping.get(k.as_str()) {
                 let v_current = current.get(k);
                 if v_current != Some(v_desired) {
-                    // Build PATCH payload
+                    // Build the PATCH/PUT/POST payload for this field.
                     let mut patch_body = serde_json::Map::new();
-                    patch_body.insert(field_map.json_path.to_string(), serde_json::to_value(v_desired).unwrap_or(serde_json::Value::Null));
-                    let url = field_map.endpoint
+                    patch_body.insert(
+                        field_map.json_path.to_string(),
+                        serde_json::to_value(v_desired).unwrap_or(serde_json::Value::Null),
+                    );
+                    let url = field_map
+                        .endpoint
                         .replace("{org}", &self.org)
                         .replace("{repo}", &repo.name);
                     let body = serde_json::Value::Object(patch_body);
 
                     if dry_run {
+                        // Log the intended action instead of performing it.
                         info!(
                             "[Dry Run] Would {} {} with body: {:?}",
                             field_map.method, url, body
@@ -351,11 +411,12 @@ impl GitHubClient {
                     }
                 }
             } else {
+                // No mapping for this setting; skip it.
                 debug!("No API mapping for repo setting '{}', skipping.", k);
             }
         }
 
-        // Webhook management remains as before
+        // If a webhook is defined in the repo config, manage it as well.
         if let Some(webhook) = repo.webhook.as_ref() {
             self.manage_webhooks(&repo.name, webhook, dry_run).await?;
         }
