@@ -1,5 +1,4 @@
 use gh_config_cli::api_mapping_generated::get_github_api_mapping;
-use gh_config_cli::api_mapping::ApiFieldMapping;
 
 #[test]
 fn test_mapping_contains_known_repo_fields() {

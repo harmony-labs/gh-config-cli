@@ -69,7 +69,7 @@ async fn main() {
 async fn run() -> AppResult<bool> {
     let args = Args::parse();
 
-    let (command, config_path, dry_run, org) = match &args.command {
+    let (command, config_path, _dry_run, _org) = match &args.command {
         Command::Diff { config } => ("diff", config, false, None),
         Command::Sync { config, dry_run } => ("sync", config, *dry_run, None),
         Command::SyncFromOrg { config, dry_run, org } => ("sync-from-org", config, *dry_run, Some(org)),

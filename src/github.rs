@@ -1,5 +1,4 @@
 use crate::config::{Assignment, Repo, RepoSettings, Team, User, WebhookConfig, Config};
-use crate::api_mapping::ApiFieldMapping;
 use crate::api_mapping_generated::get_github_api_mapping;
 use crate::error::{AppError, AppResult};
 use colored::*;
@@ -12,6 +11,7 @@ use std::fs::File;
 use std::io::Write;
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct RepoResponse {
     allow_merge_commit: bool,
     allow_squash_merge: bool,
@@ -179,6 +179,7 @@ impl GitHubClient {
         Ok(settings)
     }
 
+    #[allow(dead_code)]
     async fn get_repo_visibility(&self, repo_name: &str) -> AppResult<String> {
         let url = format!("https://api.github.com/repos/{}/{}", self.org, repo_name);
         let response = self.get(&url).await?;
