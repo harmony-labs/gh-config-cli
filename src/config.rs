@@ -108,15 +108,73 @@ impl Config {
 }
 
 /// Recursively merges defaults into main config (main config takes precedence).
-fn merge_with_defaults(mut main: Value, defaults: Value) -> Value {
+fn merge_with_defaults(main: Value, defaults: Value) -> Value {
     match (main, defaults) {
         (Value::Mapping(mut main_map), Value::Mapping(defaults_map)) => {
-            for (k, v) in defaults_map {
-                main_map.entry(k.clone()).or_insert(v);
+            for (k, v_default) in defaults_map {
+                if let Some(v_main) = main_map.remove(&k) {
+                    // Special case: if v_main is an empty sequence and v_default is a sequence,
+                    // use v_default directly
+                    let merged_value = match (v_main, &v_default) {
+                        (Value::Sequence(seq), Value::Sequence(default_seq)) if seq.is_empty() && !default_seq.is_empty() => {
+                            v_default.clone()
+                        }
+                        (v_main, _) => {
+                            merge_with_defaults(v_main, v_default.clone())
+                        }
+                    };
+                    main_map.insert(k, merged_value);
+                } else {
+                    main_map.insert(k, v_default);
+                }
             }
             Value::Mapping(main_map)
         }
-        (main, _) => main, // If not both mappings, main wins
+        (Value::Sequence(main_seq), Value::Sequence(defaults_seq)) => {
+            // If main_seq is empty, use defaults_seq directly
+            if main_seq.is_empty() {
+                return Value::Sequence(defaults_seq);
+            }
+            // Merge lists of mappings by "name" key (for repos, teams, etc.)
+            let mut merged = vec![];
+            let mut used = vec![false; main_seq.len()];
+            for d in &defaults_seq {
+                if let Value::Mapping(d_map) = d {
+                    if let Some(Value::String(d_name)) = d_map.get(&Value::String("name".to_string())) {
+                        // Try to find a matching item in main_seq
+                        let mut found = false;
+                        for (i, m) in main_seq.iter().enumerate() {
+                            if let Value::Mapping(m_map) = m {
+                                if let Some(Value::String(m_name)) = m_map.get(&Value::String("name".to_string())) {
+                                    if m_name == d_name {
+                                        // Merge recursively
+                                        merged.push(merge_with_defaults(m.clone(), d.clone()));
+                                        used[i] = true;
+                                        found = true;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        if !found {
+                            merged.push(d.clone());
+                        }
+                    } else {
+                        merged.push(d.clone());
+                    }
+                } else {
+                    merged.push(d.clone());
+                }
+            }
+            // Add all main_seq items that were not matched
+            for (i, m) in main_seq.into_iter().enumerate() {
+                if !used[i] {
+                    merged.push(m);
+                }
+            }
+            Value::Sequence(merged)
+        }
+        (main, _) => main, // If not both mappings or sequences, main wins
     }
 }
 
@@ -178,6 +236,7 @@ repos:
         ).expect("parse merged config");
 
         // Main config takes precedence
+        println!("config.repos.len() = {}", config.repos.len());
         let repo = &config.repos[0];
         assert_eq!(repo.settings.get("allow_merge_commit").unwrap().as_bool().unwrap(), true);
         assert_eq!(repo.settings.get("allow_squash_merge").unwrap().as_bool().unwrap(), true);
