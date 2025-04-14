@@ -10,7 +10,7 @@
 */
 
 use crate::config::{Assignment, Repo, RepoSettings, Team, User, WebhookConfig, Config};
-use crate::api_mapping_generated::get_github_api_mapping;
+use crate::github_api_mapping_generated::get_github_api_mapping;
 use crate::error::{AppError, AppResult};
 use colored::*;
 use log::{debug, info, error};

@@ -2,7 +2,7 @@ mod config;
 mod error;
 mod github;
 mod api_mapping;
-mod api_mapping_generated;
+mod github_api_mapping_generated;
 
 use clap::{Parser, Subcommand};
 use config::Config;

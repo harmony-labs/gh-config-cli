@@ -886,7 +886,7 @@ pub fn get_github_api_mapping() -> HashMap<&'static str, ApiFieldMapping> {
     map.insert("body", ApiFieldMapping { resource_type: "auto", config_key: "body", endpoint: "/user/projects", method: "POST", json_path: "body" });
     map.insert("name", ApiFieldMapping { resource_type: "auto", config_key: "name", endpoint: "/user/projects", method: "POST", json_path: "name" });
     map.insert("allow_auto_merge", ApiFieldMapping { resource_type: "auto", config_key: "allow_auto_merge", endpoint: "/user/repos", method: "POST", json_path: "allow_auto_merge" });
-    map.insert("allow_merge_commit", ApiFieldMapping { resource_type: "auto", config_key: "allow_merge_commit", endpoint: "/repos/{owner}/{repo}", method: "PATCH", json_path: "allow_merge_commit" });
+    map.insert("allow_merge_commit", ApiFieldMapping { resource_type: "auto", config_key: "allow_merge_commit", endpoint: "/user/repos", method: "POST", json_path: "allow_merge_commit" });
     map.insert("allow_rebase_merge", ApiFieldMapping { resource_type: "auto", config_key: "allow_rebase_merge", endpoint: "/user/repos", method: "POST", json_path: "allow_rebase_merge" });
     map.insert("allow_squash_merge", ApiFieldMapping { resource_type: "auto", config_key: "allow_squash_merge", endpoint: "/user/repos", method: "POST", json_path: "allow_squash_merge" });
     map.insert("auto_init", ApiFieldMapping { resource_type: "auto", config_key: "auto_init", endpoint: "/user/repos", method: "POST", json_path: "auto_init" });

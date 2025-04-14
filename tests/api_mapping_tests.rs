@@ -1,8 +1,9 @@
-use gh_config_cli::api_mapping_generated::get_github_api_mapping;
+use gh_config::api_mapping::get_repo_settings_mapping;
+use gh_config::github_api_mapping_generated::get_github_api_mapping;
 
 #[test]
 fn test_mapping_contains_known_repo_fields() {
-    let map = get_github_api_mapping();
+    let map = get_repo_settings_mapping();
     let amc = map.get("allow_merge_commit").expect("mapping for allow_merge_commit");
     assert!(amc.endpoint.contains("/repos/") || amc.endpoint.contains("{repo}"));
     assert_eq!(amc.method, "PATCH");
@@ -23,8 +24,6 @@ fn test_unmapped_field_returns_none() {
     let map = get_github_api_mapping();
     assert!(map.get("this_field_does_not_exist").is_none());
 }
-
-use gh_config_cli::api_mapping::get_repo_settings_mapping;
 
 #[test]
 fn test_repo_settings_mapping_contains_expected_keys() {

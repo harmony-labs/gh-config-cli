@@ -1,2 +1,2 @@
 pub mod api_mapping;
-pub mod api_mapping_generated;
+pub mod github_api_mapping_generated;
