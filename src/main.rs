@@ -80,7 +80,20 @@ async fn run() -> AppResult<bool> {
     let mut client = match &args.command {
         Command::SyncFromOrg { config: _, dry_run: _, org } => GitHubClient::new(&args.token, org),
         _ => {
+            // Load config first for Diff and Sync
             let config = Config::from_file_with_defaults(config_path, None)?;
+
+            // --- Add Org Check ---
+            if config.org.trim().is_empty() {
+                error!("Configuration file '{}' is missing the required 'org' key or its value is empty.", config_path);
+                // Use a specific error type if available, or a general one.
+                // Using GitHubApi might be slightly misleading, but fits AppError enum.
+                return Err(error::AppError::GitHubApi(
+                    "Missing or empty 'org' key in configuration file.".to_string()
+                ));
+            }
+            // --- End Org Check ---
+
             GitHubClient::new(&args.token, &config.org)
         }
     };

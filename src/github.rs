@@ -23,6 +23,8 @@ use similar::{ChangeTag, TextDiff};
 use std::fs::File;
 use std::io::Write;
 
+const GITHUB_API_BASE_URL: &str = "https://api.github.com";
+
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
 struct RepoResponse {
@@ -100,42 +102,131 @@ impl GitHubClient {
     }
 
     async fn send_patch(&self, url: &str, body: serde_json::Value) -> AppResult<()> {
-        let response = self
-            .client
-            .patch(url)
-            .header("Authorization", format!("Bearer {}", self.token))
-            .header("Accept", "application/vnd.github+json")
-            .header("User-Agent", "gh-config")
-            .json(&body)
-            .send()
-            .await?;
-        if response.status().is_success() {
-            Ok(())
-        } else {
-            let status = response.status();
-            let text = response.text().await?;
-            error!("PATCH {} failed with status {}: {}", url, status, text);
-            Err(AppError::GitHubApi(text))
+        // --- Add Enhanced Logging ---
+        debug!("Attempting to build PATCH request for URL: '{}'", url);
+        if url.trim().is_empty() {
+            error!("URL passed to send_patch() is empty!");
+            return Err(AppError::GitHubApi("Internal error: Attempted PATCH with empty URL".to_string()));
         }
+        if self.token.trim().is_empty() {
+            error!("GitHub token is empty!");
+            return Err(AppError::GitHubApi("GitHub token is empty".to_string()));
+        } else {
+            debug!("Token length: {}", self.token.len());
+        }
+        debug!("PATCH body: {:?}", body); // Log the body being sent
+        // --- End Enhanced Logging ---
+
+        // Try building step-by-step again
+        let client_ref = &self.client;
+        let builder_result = client_ref.patch(url); // Initial builder
+
+        // --- Log after initial build ---
+        debug!("reqwest::Client::patch succeeded for URL: '{}'", url); // Check if this logs
+        // ---
+
+        let auth_header_value = format!("Bearer {}", self.token);
+        if auth_header_value.contains('\n') || auth_header_value.contains('\r') {
+             error!("Authorization header value contains invalid characters (newline/CR)");
+             return Err(AppError::GitHubApi("Invalid characters in token for Authorization header".to_string()));
+        }
+
+        // Chain headers
+        let request_builder_headers = builder_result
+            .header(reqwest::header::AUTHORIZATION, auth_header_value)
+            .header(reqwest::header::ACCEPT, "application/vnd.github+json")
+            .header(reqwest::header::USER_AGENT, "gh-config");
+
+        // --- Log after headers added ---
+        debug!("Request builder headers configured."); // Check if this logs
+        // ---
+
+        // Add JSON body
+        let request_builder_final = request_builder_headers.json(&body);
+
+        // --- Log after body added ---
+        debug!("Request builder body configured (using .json())."); // Check if this logs
+        // ----
+
+        // Send the request
+        debug!("Attempting final send..."); // Check if this logs
+        let response_result = request_builder_final.send().await; // Store result before unwrapping
+
+        match response_result {
+             Ok(response) => {
+                 // --- Original status check logic ---
+                 debug!("Request send successful."); // Log success before status check
+                 let status = response.status();
+                 debug!("PATCH {} returned status: {}", url, status);
+                 if status.is_success() {
+                     Ok(())
+                 } else {
+                     let text = response.text().await?;
+                     error!("PATCH {} failed with status {}: {}", url, status, text);
+                     Err(AppError::GitHubApi(text))
+                 }
+             }
+             Err(e) => {
+                 error!("Request builder send() failed: {}", e);
+                 // Check if the error source is the builder error we saw
+                 if e.is_builder() {
+                     error!("Confirmed: Failure is a builder error during send().");
+                 } else if e.is_connect() {
+                     error!("Confirmed: Failure is a connection error during send().");
+                 } else if e.is_timeout() {
+                     error!("Confirmed: Failure is a timeout error during send().");
+                 } // Add other checks from reqwest::Error if needed
+                 Err(AppError::from(e)) // Propagate the reqwest error
+             }
+         }
+
     }
 
     async fn send_post(&self, url: &str, body: serde_json::Value) -> AppResult<()> {
-        let response = self
-            .client
-            .post(url)
-            .header("Authorization", format!("Bearer {}", self.token))
-            .header("Accept", "application/vnd.github+json")
-            .header("User-Agent", "gh-config")
-            .json(&body)
-            .send()
-            .await?;
-        if response.status().is_success() {
-            Ok(())
-        } else {
-            let status = response.status();
-            let text = response.text().await?;
-            error!("POST {} failed with status {}: {}", url, status, text);
-            Err(AppError::GitHubApi(text))
+        // --- Add Similar Enhanced Logging ---
+        debug!("Attempting to build POST request for URL: '{}'", url);
+        if url.trim().is_empty() { /* ... */ }
+        if self.token.trim().is_empty() { /* ... */ } else { debug!("Token length: {}", self.token.len()); }
+        debug!("POST body: {:?}", body);
+
+        let client_ref = &self.client;
+        let builder_result = client_ref.post(url); // Initial builder
+        debug!("reqwest::Client::post succeeded for URL: '{}'", url);
+
+        let auth_header_value = format!("Bearer {}", self.token);
+        if auth_header_value.contains('\n') || auth_header_value.contains('\r') { /* ... */ }
+
+        let request_builder_headers = builder_result
+            .header(reqwest::header::AUTHORIZATION, auth_header_value)
+            .header(reqwest::header::ACCEPT, "application/vnd.github+json")
+            .header(reqwest::header::USER_AGENT, "gh-config");
+        debug!("Request builder headers configured.");
+
+        let request_builder_final = request_builder_headers.json(&body);
+        debug!("Request builder body configured (using .json()).");
+
+        debug!("Attempting final send...");
+        let response_result = request_builder_final.send().await; // Store result
+
+        match response_result {
+            Ok(response) => {
+                debug!("Request send successful.");
+                let status = response.status();
+                debug!("POST {} returned status: {}", url, status);
+                if status.is_success() {
+                    Ok(())
+                } else {
+                    let text = response.text().await?;
+                    error!("POST {} failed with status {}: {}", url, status, text);
+                    Err(AppError::GitHubApi(text))
+                }
+            }
+            Err(e) => {
+                error!("Request builder send() failed: {}", e);
+                if e.is_builder() { error!("Confirmed: Failure is a builder error during send()."); }
+                // ... other error checks ...
+                Err(AppError::from(e))
+            }
         }
     }
 
@@ -161,14 +252,51 @@ impl GitHubClient {
     }
 
     async fn get(&self, url: &str) -> AppResult<reqwest::Response> {
-        let response = self
-            .client
-            .get(url)
-            .header("Authorization", format!("Bearer {}", self.token))
-            .header("Accept", "application/vnd.github+json")
-            .header("User-Agent", "gh-config")
-            .send()
-            .await?;
+        // --- Add Enhanced Logging ---
+        debug!("Attempting to build GET request for URL: '{}'", url);
+        if url.trim().is_empty() {
+             error!("URL passed to get() is empty!");
+             return Err(AppError::GitHubApi("Internal error: Attempted GET with empty URL".to_string()));
+        }
+        // Check token validity superficially (e.g., not empty)
+        if self.token.trim().is_empty() {
+            error!("GitHub token is empty!");
+            // Although this usually causes 401 later, an empty Bearer token might fail earlier.
+            return Err(AppError::GitHubApi("GitHub token is empty".to_string()));
+        } else {
+             // Log length as a non-sensitive indicator
+             debug!("Token length: {}", self.token.len());
+        }
+        // --- End Enhanced Logging ---
+
+        // Try building the request step-by-step to isolate the failure
+        let client_ref = &self.client; // Borrow client
+        let builder_result = client_ref.get(url); // Create builder
+
+        // --- Log after potential URL parsing failure ---
+        debug!("reqwest::Client::get succeeded for URL: '{}'", url);
+        // ---
+
+        let auth_header_value = format!("Bearer {}", self.token);
+        // Validate auth header value doesn't contain obviously invalid chars like newline
+        if auth_header_value.contains('\n') || auth_header_value.contains('\r') {
+             error!("Authorization header value contains invalid characters (newline/CR)");
+             return Err(AppError::GitHubApi("Invalid characters in token for Authorization header".to_string()));
+        }
+
+        // Chain the rest - if it fails here, it's likely header related
+        let request_builder = builder_result
+            .header(reqwest::header::AUTHORIZATION, auth_header_value) // Use constant for clarity
+            .header(reqwest::header::ACCEPT, "application/vnd.github+json")
+            .header(reqwest::header::USER_AGENT, "gh-config");
+
+        // --- Log before send ---
+        debug!("Request builder fully configured, attempting send...");
+        // ---
+
+        let response = request_builder.send().await?;
+
+        // --- Original status check logic ---
         let status = response.status();
         debug!("GET {} returned status: {}", url, status);
         if status.is_success() {
@@ -182,16 +310,16 @@ impl GitHubClient {
 
     /// Fetch all settings for a repo as a HashMap<String, serde_yaml::Value>
     async fn get_repo_settings(&self, repo_name: &str) -> AppResult<RepoSettings> {
-        let url = format!("https://api.github.com/repos/{}/{}", self.org, repo_name);
-        let response = self.get(&url).await?;
+        let full_url = format!("{}/repos/{}/{}", GITHUB_API_BASE_URL, self.org, repo_name);
+        let response = self.get(&full_url).await?;
         let text = response.text().await?;
         if text.is_empty() {
-            error!("Empty response body from GET {}", url);
+            error!("Empty response body from GET {}", full_url);
             return Err(AppError::GitHubApi("Empty response body".to_string()));
         }
-        debug!("Raw response for {}: {}", url, text);
+        debug!("Raw response for {}: {}", full_url, text);
         let repo_json: serde_json::Value = serde_json::from_str(&text)
-            .map_err(|e| AppError::GitHubApi(format!("Failed to parse response from {}: {}", url, e)))?;
+            .map_err(|e| AppError::GitHubApi(format!("Failed to parse response from {}: {}", full_url, e)))?;
         // Convert to serde_yaml::Value for consistency with config
         let repo_yaml: serde_yaml::Value = serde_yaml::to_value(repo_json)
             .map_err(|e| AppError::GitHubApi(format!("Failed to convert repo JSON to YAML: {}", e)))?;
@@ -209,29 +337,29 @@ impl GitHubClient {
 
     #[allow(dead_code)]
     async fn get_repo_visibility(&self, repo_name: &str) -> AppResult<String> {
-        let url = format!("https://api.github.com/repos/{}/{}", self.org, repo_name);
-        let response = self.get(&url).await?;
+        let full_url = format!("{}/repos/{}/{}", GITHUB_API_BASE_URL, self.org, repo_name);
+        let response = self.get(&full_url).await?;
         let text = response.text().await?;
         if text.is_empty() {
-            error!("Empty response body from GET {}", url);
+            error!("Empty response body from GET {}", full_url);
             return Err(AppError::GitHubApi("Empty response body".to_string()));
         }
         let repo: RepoResponse = serde_json::from_str(&text)
-            .map_err(|e| AppError::GitHubApi(format!("Failed to parse response from {}: {}", url, e)))?;
+            .map_err(|e| AppError::GitHubApi(format!("Failed to parse response from {}: {}", full_url, e)))?;
         Ok(if repo.private { "private" } else { "public" }.to_string())
     }
 
     async fn get_team(&self, team_name: &str) -> AppResult<Option<TeamResponse>> {
-        let url = format!("https://api.github.com/orgs/{}/teams/{}", self.org, team_name);
-        match self.get(&url).await {
+        let full_url = format!("{}/orgs/{}/teams/{}", GITHUB_API_BASE_URL, self.org, team_name);
+        match self.get(&full_url).await {
             Ok(response) => {
                 let text = response.text().await?;
                 if text.is_empty() {
-                    error!("Empty response body from GET {}", url);
+                    error!("Empty response body from GET {}", full_url);
                     return Err(AppError::GitHubApi("Empty response body".to_string()));
                 }
                 let team: TeamResponse = serde_json::from_str(&text)
-                    .map_err(|e| AppError::GitHubApi(format!("Failed to parse response from {}: {}", url, e)))?;
+                    .map_err(|e| AppError::GitHubApi(format!("Failed to parse response from {}: {}", full_url, e)))?;
                 if team.name == team_name {
                     Ok(Some(team))
                 } else {
@@ -244,16 +372,16 @@ impl GitHubClient {
     }
 
     async fn get_user_membership(&self, login: &str) -> AppResult<Option<String>> {
-        let url = format!("https://api.github.com/orgs/{}/memberships/{}", self.org, login);
-        match self.get(&url).await {
+        let full_url = format!("{}/orgs/{}/memberships/{}", GITHUB_API_BASE_URL, self.org, login);
+        match self.get(&full_url).await {
             Ok(response) => {
                 let text = response.text().await?;
                 if text.is_empty() {
-                    error!("Empty response body from GET {}", url);
+                    error!("Empty response body from GET {}", full_url);
                     return Err(AppError::GitHubApi("Empty response body".to_string()));
                 }
                 let membership: MembershipResponse = serde_json::from_str(&text)
-                    .map_err(|e| AppError::GitHubApi(format!("Failed to parse response from {}: {}", url, e)))?;
+                    .map_err(|e| AppError::GitHubApi(format!("Failed to parse response from {}: {}", full_url, e)))?;
                 Ok(Some(membership.role))
             }
             Err(AppError::GitHubApi(e)) if e.contains("404") => Ok(None),
@@ -262,8 +390,8 @@ impl GitHubClient {
     }
 
     async fn get_team_repos(&self, team_name: &str) -> AppResult<Vec<TeamRepoResponse>> {
-        let url = format!("https://api.github.com/orgs/{}/teams/{}/repos?per_page=100", self.org, team_name);
-        let response = self.get(&url).await?;
+        let full_url = format!("{}/orgs/{}/teams/{}/repos?per_page=100", GITHUB_API_BASE_URL, self.org, team_name);
+        let response = self.get(&full_url).await?;
         let text = response.text().await?;
         let repos: Vec<TeamRepoResponse> = serde_json::from_str(&text)
             .map_err(|e| AppError::GitHubApi(format!("Failed to parse team repos: {}", e)))?;
@@ -281,8 +409,8 @@ impl GitHubClient {
     /// * `Err(AppError)` if the API call or parsing fails.
     ///
     pub async fn get_webhooks(&self, repo_name: &str) -> AppResult<Vec<WebhookResponse>> {
-        let url = format!("https://api.github.com/repos/{}/{}/hooks", self.org, repo_name);
-        let response = self.get(&url).await?;
+        let full_url = format!("{}/repos/{}/{}/hooks", GITHUB_API_BASE_URL, self.org, repo_name);
+        let response = self.get(&full_url).await?;
         let text = response.text().await?;
         let webhooks: Vec<WebhookResponse> = serde_json::from_str(&text)
             .map_err(|e| AppError::GitHubApi(format!("Failed to parse webhooks: {}", e)))?;
@@ -290,17 +418,19 @@ impl GitHubClient {
     }
 
     async fn create_webhook(&self, repo_name: &str, webhook: &WebhookConfig) -> AppResult<()> {
-        let url = format!("https://api.github.com/repos/{}/{}/hooks", self.org, repo_name);
+        let url = format!("{}/repos/{}/{}/hooks", GITHUB_API_BASE_URL, self.org, repo_name);
+    
         let body = json!({
-            "name": "web",
+            "name": "web", // Standard name for webhooks
             "active": true,
-            "events": webhook.events,
+            "events": webhook.events, // Use the events from the parameter
             "config": {
-                "url": webhook.url,
-                "content_type": webhook.content_type,
-                "insecure_ssl": "0"
+                "url": webhook.url, // Use the URL from the parameter
+                "content_type": webhook.content_type, // Use the content_type from the parameter
+                "insecure_ssl": "0" // Standard setting
             }
         });
+    
         debug!("Webhook create payload: {}", serde_json::to_string(&body)?);
         info!("Creating webhook for {}/{}", self.org, repo_name);
         self.send_post(&url, body).await?;
@@ -308,18 +438,25 @@ impl GitHubClient {
     }
 
     async fn update_webhook(&self, repo_name: &str, hook_id: i64, webhook: &WebhookConfig) -> AppResult<()> {
-        let url = format!("https://api.github.com/repos/{}/{}/hooks/{}", self.org, repo_name, hook_id);
+        let url = format!("{}/repos/{}/{}/hooks/{}", GITHUB_API_BASE_URL, self.org, repo_name, hook_id);
+    
         let body = json!({
-            "active": true,
-            "events": webhook.events,
+            // Note: Do not include "name" or "active" when updating
+            // according to some GitHub API docs, only config/events/add_events/remove_events
+            // Let's stick to config and events for simplicity here. Re-add 'active' if needed.
+            // "active": true, // Usually controlled separately if needed
+            "events": webhook.events, // Use the events from the parameter
             "config": {
-                "url": webhook.url,
-                "content_type": webhook.content_type,
-                "insecure_ssl": "0"
+                "url": webhook.url, // Use the URL from the parameter
+                "content_type": webhook.content_type, // Use the content_type from the parameter
+                "insecure_ssl": "0" // Standard setting
             }
+            // "add_events": [], // Optional: Specific events to add without replacing all
+            // "remove_events": [] // Optional: Specific events to remove
         });
+    
         debug!("Webhook update payload: {}", serde_json::to_string(&body)?);
-        info!("Updating webhook for {}/{}", self.org, repo_name);
+        info!("Updating webhook {} for {}/{}", hook_id, self.org, repo_name); // Log hook_id
         self.send_patch(&url, body).await?;
         Ok(())
     }
@@ -380,49 +517,74 @@ impl GitHubClient {
         let desired = &repo.settings;
         let mapping = get_github_api_mapping();
 
-        // For each mapped field, if it differs from the current value, send a PATCH/PUT/POST to the correct endpoint.
+        // --- Optimization suggestion (Apply after fixing URL): ---
+        // Instead of sending one PATCH per setting, collect all PATCHes for the same endpoint.
+        // Create a HashMap<String, serde_json::Map<String, serde_json::Value>> where the key is the endpoint URL.
+        let mut pending_updates: HashMap<String, (String, serde_json::Map<String, serde_json::Value>)> = HashMap::new();
+        // The tuple stores (HTTP Method, Body Map)
+
         for (k, v_desired) in desired.iter() {
             if let Some(field_map) = mapping.get(k.as_str()) {
                 let v_current = current.get(k);
                 if v_current != Some(v_desired) {
-                    // Build the PATCH/PUT/POST payload for this field.
-                    let mut patch_body = serde_json::Map::new();
-                    patch_body.insert(
-                        field_map.json_path.to_string(),
-                        serde_json::to_value(v_desired).unwrap_or(serde_json::Value::Null),
-                    );
-                    let url = field_map
+                    // Construct the *full* URL for this *specific* setting's mapped endpoint
+                     let relative_path = field_map
                         .endpoint
                         .replace("{org}", &self.org)
-                        .replace("{repo}", &repo.name);
-                    let body = serde_json::Value::Object(patch_body);
+                        .replace("{owner}", &self.org)
+                        .replace("{repo}", &repo.name); // Add other replacements if needed (e.g., {team_slug})
 
-                    if dry_run {
-                        // Log the intended action instead of performing it.
-                        info!(
-                            "[Dry Run] Would {} {} with body: {:?}",
-                            field_map.method, url, body
-                        );
-                    } else {
-                        info!("{} {} with body: {:?}", field_map.method, url, body);
-                        match field_map.method {
-                            "PATCH" => self.send_patch(&url, body).await?,
-                            "PUT" => self.send_put(&url, Some(body)).await?,
-                            "POST" => self.send_post(&url, body).await?,
-                            _ => error!("Unsupported HTTP method: {}", field_map.method),
-                        }
-                    }
+                    // ****** THIS IS THE KEY FIX ******
+                    let full_url = format!("{}{}", GITHUB_API_BASE_URL, relative_path);
+                    // ****** END KEY FIX ******
+
+                    // Optimization: Group updates by full_url and method
+                    let (_, body_map) = pending_updates
+                         .entry(full_url.clone()) // Group by the calculated full URL
+                         .or_insert_with(|| (field_map.method.to_string(), serde_json::Map::new())); // Store method and init body map
+
+                    // Add the current setting change to the body map for this URL
+                     body_map.insert(
+                        field_map.json_path.to_string(), // Use the key expected by the API
+                        serde_json::to_value(v_desired).unwrap_or(serde_json::Value::Null),
+                    );
                 }
             } else {
-                // No mapping for this setting; skip it.
                 debug!("No API mapping for repo setting '{}', skipping.", k);
             }
         }
 
-        // If a webhook is defined in the repo config, manage it as well.
-        if let Some(webhook) = repo.webhook.as_ref() {
-            self.manage_webhooks(&repo.name, webhook, dry_run).await?;
+
+        // --- Apply Grouped Updates ---
+        for (full_url, (method, body_map)) in pending_updates {
+             if body_map.is_empty() { continue; } // Skip if no changes ended up for this group
+
+             let body = serde_json::Value::Object(body_map);
+
+             if dry_run {
+                 info!(
+                     "[Dry Run] Would {} {} with body: {:?}",
+                     method, full_url, body // Log the full URL
+                 );
+             } else {
+                 debug!("{} {} with body: {:?}", method, full_url, body); // Log the full URL
+                 match method.as_str() { // Use the stored method string
+                     "PATCH" => self.send_patch(&full_url, body).await?, // Pass the FULL URL
+                     "PUT" => self.send_put(&full_url, Some(body)).await?, // Pass the FULL URL
+                     "POST" => self.send_post(&full_url, body).await?, // Pass the FULL URL
+                     _ => error!("Unsupported HTTP method: {}", method),
+                 }
+                 info!("Applied relevant settings changes for repo {} via {}", repo.name, full_url); // Add success log
+             }
         }
+
+
+        // If a webhook is defined in the repo config, manage it as well.
+        // Ensure manage_webhooks also uses full URLs if it calls send_* methods directly.
+         if let Some(webhook) = repo.webhook.as_ref() {
+             self.manage_webhooks(&repo.name, webhook, dry_run).await?;
+         }
+
         Ok(())
     }
 
@@ -457,30 +619,30 @@ impl GitHubClient {
             }
             Ok(())
         } else if existing.is_none() {
-            let url = format!("https://api.github.com/orgs/{}/teams", self.org);
+            let full_url = format!("{}/orgs/{}/teams", GITHUB_API_BASE_URL, self.org);
             let body = json!({
                 "name": team.name,
                 "privacy": "closed"
             });
             info!("Creating team: {}", team.name);
-            self.send_post(&url, body).await?;
+            self.send_post(&full_url, body).await?;
             for member in &team.members {
-                let member_url = format!(
-                    "https://api.github.com/orgs/{}/teams/{}/memberships/{}",
-                    self.org, team.name, member
+                let member_full_url = format!(
+                    "{}/orgs/{}/teams/{}/memberships/{}",
+                    GITHUB_API_BASE_URL, self.org, team.name, member
                 );
-                self.send_put(&member_url, None).await?;
+                self.send_put(&member_full_url, None).await?;
                 info!("Added {} to team {}", member, team.name);
             }
             Ok(())
         } else {
             info!("Team {} already exists, updating members", team.name);
             for member in &team.members {
-                let member_url = format!(
-                    "https://api.github.com/orgs/{}/teams/{}/memberships/{}",
-                    self.org, team.name, member
+                let member_full_url = format!(
+                    "{}/orgs/{}/teams/{}/memberships/{}",
+                    GITHUB_API_BASE_URL, self.org, team.name, member
                 );
-                match self.send_put(&member_url, None).await {
+                match self.send_put(&member_full_url, None).await {
                     Ok(()) => info!("Added or confirmed {} in team {}", member, team.name),
                     Err(e) => error!("Failed to add {} to team {}: {}", member, team.name, e),
                 }
@@ -519,15 +681,15 @@ impl GitHubClient {
             }
             Ok(())
         } else {
-            let url = format!(
-                "https://api.github.com/orgs/{}/memberships/{}",
-                self.org, user.login
+            let full_url = format!(
+                "{}/orgs/{}/memberships/{}",
+                GITHUB_API_BASE_URL, self.org, user.login
             );
             let body = json!({
                 "role": user.role
             });
             info!("Adding {} to org with role {}", user.login, user.role);
-            self.send_put(&url, Some(body)).await?;
+            self.send_put(&full_url, Some(body)).await?;
             Ok(())
         }
     }
@@ -570,9 +732,9 @@ impl GitHubClient {
             }
             Ok(())
         } else {
-            let url = format!(
-                "https://api.github.com/orgs/{}/teams/{}/repos/{}/{}",
-                self.org, assignment.team, self.org, assignment.repo
+            let full_url = format!(
+                "{}/orgs/{}/teams/{}/repos/{}/{}",
+                GITHUB_API_BASE_URL, self.org, assignment.team, self.org, assignment.repo
             );
             let body = json!({
                 "permission": assignment.permission
@@ -581,25 +743,25 @@ impl GitHubClient {
                 "Assigning team {} to repo {} with permission {}",
                 assignment.team, assignment.repo, assignment.permission
             );
-            self.send_put(&url, Some(body)).await?;
+            self.send_put(&full_url, Some(body)).await?;
             Ok(())
         }
     }
 
     async fn get_team_repo_permission(&self, team: &str, repo: &str) -> AppResult<Option<String>> {
-        let url = format!(
-            "https://api.github.com/orgs/{}/teams/{}/repos/{}/{}",
-            self.org, team, self.org, repo
+        let full_url = format!(
+            "{}/orgs/{}/teams/{}/repos/{}/{}",
+            GITHUB_API_BASE_URL, self.org, team, self.org, repo
         );
-        match self.get(&url).await {
+        match self.get(&full_url).await {
             Ok(response) => {
                 let text = response.text().await?;
                 if text.is_empty() {
-                    debug!("Empty response body from GET {}, assuming permission exists but not detailed", url);
+                    debug!("Empty response body from GET {}, assuming permission exists but not detailed", full_url);
                     return Ok(Some("push".to_string()));
                 }
                 let perms: TeamRepoResponse = serde_json::from_str(&text)
-                    .map_err(|e| AppError::GitHubApi(format!("Failed to parse response from {}: {}", url, e)))?;
+                    .map_err(|e| AppError::GitHubApi(format!("Failed to parse response from {}: {}", full_url, e)))?;
                 let permission = if perms.permissions.admin {
                     "admin"
                 } else if perms.permissions.push {
@@ -614,104 +776,6 @@ impl GitHubClient {
             Err(AppError::GitHubApi(e)) if e.contains("404") => Ok(None),
             Err(e) => Err(e),
         }
-    }
-
-    pub async fn generate_config_from_org(&self) -> AppResult<Config> {
-        let mut repos = Vec::new();
-        let repo_url = format!("https://api.github.com/orgs/{}/repos?per_page=100", self.org);
-        let repo_response = self.get(&repo_url).await?;
-        let repo_json: Vec<serde_json::Value> = repo_response.json().await
-            .map_err(|e| AppError::Http(e))?;
-
-        for repo in repo_json {
-            let name = repo["name"].as_str().ok_or_else(|| AppError::GitHubApi("Missing repo name".to_string()))?.to_string();
-            let settings = self.get_repo_settings(&name).await?; // Use individual repo endpoint
-            let visibility = if repo["private"].as_bool().unwrap_or(false) { Some("private".to_string()) } else { Some("public".to_string()) };
-            let webhooks = self.get_webhooks(&name).await?;
-            let webhook = webhooks.first().map(|wh| WebhookConfig {
-                url: wh.config.url.clone(),
-                content_type: wh.config.content_type.clone(),
-                events: wh.events.clone(),
-            });
-
-            repos.push(Repo {
-                name,
-                settings,
-                visibility,
-                webhook,
-                branch_protections: vec![],
-                extra: std::collections::HashMap::new(),
-            });
-        }
-
-        let mut teams = Vec::new();
-        let team_url = format!("https://api.github.com/orgs/{}/teams?per_page=100", self.org);
-        let team_response = self.get(&team_url).await?;
-        let team_json: Vec<serde_json::Value> = team_response.json().await
-            .map_err(|e| AppError::Http(e))?;
-
-        for team in team_json {
-            let name = team["name"].as_str().ok_or_else(|| AppError::GitHubApi("Missing team name".to_string()))?.to_string();
-            let members_url = format!("https://api.github.com/orgs/{}/teams/{}/members?per_page=100", self.org, name);
-            let members_response = self.get(&members_url).await?;
-            let members_json: Vec<serde_json::Value> = members_response.json().await
-                .map_err(|e| AppError::Http(e))?;
-            let mut members = members_json.iter()
-                .filter_map(|m| m["login"].as_str().map(String::from))
-                .collect::<Vec<String>>();
-            members.sort();
-
-            teams.push(Team { name, members });
-        }
-
-        let mut users = Vec::new();
-        let members_url = format!("https://api.github.com/orgs/{}/members?per_page=100", self.org);
-        let members_response = self.get(&members_url).await?;
-        let members_json: Vec<serde_json::Value> = members_response.json().await
-            .map_err(|e| AppError::Http(e))?;
-
-        for member in members_json {
-            let login = member["login"].as_str().ok_or_else(|| AppError::GitHubApi("Missing member login".to_string()))?.to_string();
-            let role_response = self.get_user_membership(&login).await?;
-            let role = role_response.unwrap_or("member".to_string());
-            users.push(User { login, role });
-        }
-
-        let mut assignments = Vec::new();
-        for team in &teams {
-            let team_repos = self.get_team_repos(&team.name).await?;
-            for repo in team_repos {
-                let permission = if repo.permissions.admin {
-                    "admin"
-                } else if repo.permissions.push {
-                    "push"
-                } else if repo.permissions.pull {
-                    "pull"
-                } else {
-                    "none"
-                };
-                if permission != "none" {
-                    assignments.push(Assignment {
-                        repo: repo.name.clone(),
-                        team: team.name.clone(),
-                        permission: permission.to_string(),
-                    });
-                }
-            }
-        }
-
-        let default_webhook = repos.first().and_then(|r| r.webhook.clone());
-
-        Ok(Config {
-            org: self.org.clone(),
-            repos,
-            teams,
-            users,
-            assignments,
-            default_webhook,
-            default_branch_protections: vec![],
-            extra: std::collections::HashMap::new(),
-        })
     }
 
     pub async fn generate_config_and_write(&self, config_path: &str, dry_run: bool) -> AppResult<()> {
@@ -997,26 +1061,34 @@ impl GitHubClient {
 
         // Sync resources
         for repo in &config.repos {
-            // We already checked/applied default webhook, so repo.webhook should be Some if needed
-             self.update_repo_settings(repo, dry_run).await?;
+            // --- Add logging just before the failing call ---
+            info!("Processing repo: {}/{}", self.org, repo.name);
+            if repo.name.trim().is_empty() {
+                 error!("Found repo with empty name in config file '{}'.", config_path);
+                 return Err(AppError::GitHubApi("Invalid empty repo name found in config.".to_string()));
+            }
+            // You might add more validation for repo.name characters here if needed
+            // --- End logging ---
+
+            self.update_repo_settings(repo, dry_run).await?; // This is the first call in the loop
         }
 
+        // Teams
         for team in &config.teams {
-            self.create_team(team, dry_run).await?;
+            info!("Processing team: {}", team.name); // Add similar logging for other resources
+          self.create_team(team, dry_run).await?;
         }
 
-        // Add logic to fetch existing org members and sync roles (handle additions/removals/role changes)
-        // This needs more careful handling than just adding users.
-        // For now, keep the simplistic add/update:
+        // Users
         for user in &config.users {
-             self.add_user_to_org(user, dry_run).await?;
+            info!("Processing user: {}", user.login); // Add similar logging
+            self.add_user_to_org(user, dry_run).await?;
         }
 
-
-        // Add logic to fetch existing assignments and sync permissions (handle additions/removals/permission changes)
-        // For now, keep the simplistic add/update:
+        // Assignments
         for assignment in &config.assignments {
-             self.assign_team_to_repo(assignment, dry_run).await?;
+            info!("Processing assignment: Team '{}' on Repo '{}'", assignment.team, assignment.repo); // Add similar logging
+            self.assign_team_to_repo(assignment, dry_run).await?;
         }
 
         if dry_run {
@@ -1344,16 +1416,6 @@ impl GitHubClient {
         // Repos
         diff_local_config.repos.sort_by(|a, b| a.name.cmp(&b.name));
         diff_github_config.repos.sort_by(|a, b| a.name.cmp(&b.name));
-        // Sort settings within each repo for consistency
-        for repo in &mut diff_local_config.repos {
-                let sorted_settings: std::collections::BTreeMap<_,_> = repo.settings.clone().into_iter().collect();
-                repo.settings = sorted_settings.into_iter().collect();
-        }
-        for repo in &mut diff_github_config.repos {
-                let sorted_settings: std::collections::BTreeMap<_,_> = repo.settings.clone().into_iter().collect();
-                repo.settings = sorted_settings.into_iter().collect();
-        }
-
 
         // Teams (and members within teams)
         diff_local_config.teams.sort_by(|a, b| a.name.cmp(&b.name));
@@ -1377,8 +1439,8 @@ impl GitHubClient {
         let diff = TextDiff::from_lines(&github_yaml, &local_yaml);
 
         // Corrected: Bind the configured builder to ensure it lives long enough
-        let mut unifiedDiff = diff.unified_diff();
-        let unified_diff_builder = unifiedDiff // Create the builder
+        let mut unified_diff = diff.unified_diff();
+        let unified_diff_builder = unified_diff // Create the builder
             .context_radius(3)                           // Configure it
             .header("GitHub (Normalized)", "Local Config (Normalized)"); // Configure it further
 

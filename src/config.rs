@@ -8,7 +8,7 @@
 use serde::{Deserialize, Serialize};
 
 use serde_yaml::Value;
-use std::collections::HashMap;
+use std::collections::{HashMap, BTreeMap};
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 ///
@@ -28,7 +28,7 @@ pub struct WebhookConfig {
 
 // Extensible settings: arbitrary key-value pairs for repo settings
 /// Arbitrary key-value pairs for repository settings (extensible).
-pub type RepoSettings = HashMap<String, Value>;
+pub type RepoSettings = BTreeMap<String, Value>;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 ///
@@ -72,7 +72,7 @@ impl Default for BranchProtectionRule {
 pub struct Repo {
     /// Name of the repository.
     pub name: String,
-    #[serde(default)]
+    #[serde(default = "RepoSettings::new")]
     pub settings: RepoSettings, // Now extensible
     #[serde(default)]
     pub visibility: Option<String>,

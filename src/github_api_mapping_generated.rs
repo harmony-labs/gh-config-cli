@@ -1,9 +1,7 @@
 // AUTO-GENERATED FILE. DO NOT EDIT BY HAND.
 // Please run `make generate-api-mappings` to regenerate.
-// WARNING: This mapping might contain collisions where multiple API endpoints
-// use the same configuration key (e.g., 'url' for repo hooks and org hooks).
-// The generator currently keeps the *last processed* mapping for such keys.
-// A robust solution requires changes to the mapping structure and application logic.
+// This generator prioritizes PATCH /repos/{owner}/{repo} for repo settings.
+// WARNING: Collisions for other keys might still use the *last processed* mapping.
 use std::collections::HashMap;
 use crate::api_mapping::ApiFieldMapping;
 pub fn get_github_api_mapping() -> HashMap<&'static str, ApiFieldMapping> {
@@ -18,14 +16,14 @@ pub fn get_github_api_mapping() -> HashMap<&'static str, ApiFieldMapping> {
     map.insert("advanced_security", ApiFieldMapping { resource_type: "org", config_key: "advanced_security", endpoint: "/orgs/{org}/code-security/configurations/{configuration_id}", method: "PATCH", json_path: "advanced_security" });
     map.insert("advanced_security_enabled_for_new_repositories", ApiFieldMapping { resource_type: "org", config_key: "advanced_security_enabled_for_new_repositories", endpoint: "/orgs/{org}", method: "PATCH", json_path: "advanced_security_enabled_for_new_repositories" });
     map.insert("after_id", ApiFieldMapping { resource_type: "repo", config_key: "after_id", endpoint: "/repos/{owner}/{repo}/issues/{issue_number}/sub_issues/priority", method: "PATCH", json_path: "after_id" });
-    map.insert("allow_auto_merge", ApiFieldMapping { resource_type: "user", config_key: "allow_auto_merge", endpoint: "/user/repos", method: "POST", json_path: "allow_auto_merge" });
+    map.insert("allow_auto_merge", ApiFieldMapping { resource_type: "repo", config_key: "allow_auto_merge", endpoint: "/repos/{owner}/{repo}", method: "PATCH", json_path: "allow_auto_merge" });
     map.insert("allow_deletions", ApiFieldMapping { resource_type: "repo", config_key: "allow_deletions", endpoint: "/repos/{owner}/{repo}/branches/{branch}/protection", method: "PUT", json_path: "allow_deletions" });
     map.insert("allow_force_pushes", ApiFieldMapping { resource_type: "repo", config_key: "allow_force_pushes", endpoint: "/repos/{owner}/{repo}/branches/{branch}/protection", method: "PUT", json_path: "allow_force_pushes" });
     map.insert("allow_fork_syncing", ApiFieldMapping { resource_type: "repo", config_key: "allow_fork_syncing", endpoint: "/repos/{owner}/{repo}/branches/{branch}/protection", method: "PUT", json_path: "allow_fork_syncing" });
     map.insert("allow_forking", ApiFieldMapping { resource_type: "repo", config_key: "allow_forking", endpoint: "/repos/{owner}/{repo}", method: "PATCH", json_path: "allow_forking" });
-    map.insert("allow_merge_commit", ApiFieldMapping { resource_type: "user", config_key: "allow_merge_commit", endpoint: "/user/repos", method: "POST", json_path: "allow_merge_commit" });
-    map.insert("allow_rebase_merge", ApiFieldMapping { resource_type: "user", config_key: "allow_rebase_merge", endpoint: "/user/repos", method: "POST", json_path: "allow_rebase_merge" });
-    map.insert("allow_squash_merge", ApiFieldMapping { resource_type: "user", config_key: "allow_squash_merge", endpoint: "/user/repos", method: "POST", json_path: "allow_squash_merge" });
+    map.insert("allow_merge_commit", ApiFieldMapping { resource_type: "repo", config_key: "allow_merge_commit", endpoint: "/repos/{owner}/{repo}", method: "PATCH", json_path: "allow_merge_commit" });
+    map.insert("allow_rebase_merge", ApiFieldMapping { resource_type: "repo", config_key: "allow_rebase_merge", endpoint: "/repos/{owner}/{repo}", method: "PATCH", json_path: "allow_rebase_merge" });
+    map.insert("allow_squash_merge", ApiFieldMapping { resource_type: "repo", config_key: "allow_squash_merge", endpoint: "/repos/{owner}/{repo}", method: "PATCH", json_path: "allow_squash_merge" });
     map.insert("allow_update_branch", ApiFieldMapping { resource_type: "repo", config_key: "allow_update_branch", endpoint: "/repos/{owner}/{repo}", method: "PATCH", json_path: "allow_update_branch" });
     map.insert("allowed_actions", ApiFieldMapping { resource_type: "repo", config_key: "allowed_actions", endpoint: "/repos/{owner}/{repo}/actions/permissions", method: "PUT", json_path: "allowed_actions" });
     map.insert("allowed_values", ApiFieldMapping { resource_type: "org", config_key: "allowed_values", endpoint: "/orgs/{org}/properties/schema/{custom_property_name}", method: "PUT", json_path: "allowed_values" });
@@ -36,11 +34,11 @@ pub fn get_github_api_mapping() -> HashMap<&'static str, ApiFieldMapping> {
     map.insert("artifact_id", ApiFieldMapping { resource_type: "repo", config_key: "artifact_id", endpoint: "/repos/{owner}/{repo}/pages/deployments", method: "POST", json_path: "artifact_id" });
     map.insert("artifact_url", ApiFieldMapping { resource_type: "repo", config_key: "artifact_url", endpoint: "/repos/{owner}/{repo}/pages/deployments", method: "POST", json_path: "artifact_url" });
     map.insert("assignee", ApiFieldMapping { resource_type: "repo", config_key: "assignee", endpoint: "/repos/{owner}/{repo}/issues/{issue_number}", method: "PATCH", json_path: "assignee" });
-    map.insert("assignees", ApiFieldMapping { resource_type: "repo", config_key: "assignees", endpoint: "/repos/{owner}/{repo}/issues/{issue_number}/assignees", method: "POST", json_path: "assignees" });
+    map.insert("assignees", ApiFieldMapping { resource_type: "repo", config_key: "assignees", endpoint: "/repos/{owner}/{repo}/issues/{issue_number}", method: "PATCH", json_path: "assignees" });
     map.insert("async", ApiFieldMapping { resource_type: "org", config_key: "async", endpoint: "/orgs/{org}/outside_collaborators/{username}", method: "PUT", json_path: "async" });
     map.insert("author", ApiFieldMapping { resource_type: "repo", config_key: "author", endpoint: "/repos/{owner}/{repo}/git/commits", method: "POST", json_path: "author" });
     map.insert("auto_inactive", ApiFieldMapping { resource_type: "repo", config_key: "auto_inactive", endpoint: "/repos/{owner}/{repo}/deployments/{deployment_id}/statuses", method: "POST", json_path: "auto_inactive" });
-    map.insert("auto_init", ApiFieldMapping { resource_type: "user", config_key: "auto_init", endpoint: "/user/repos", method: "POST", json_path: "auto_init" });
+    map.insert("auto_init", ApiFieldMapping { resource_type: "repo_create_user", config_key: "auto_init", endpoint: "/user/repos", method: "POST", json_path: "auto_init" });
     map.insert("auto_merge", ApiFieldMapping { resource_type: "repo", config_key: "auto_merge", endpoint: "/repos/{owner}/{repo}/deployments", method: "POST", json_path: "auto_merge" });
     map.insert("auto_trigger_checks", ApiFieldMapping { resource_type: "repo", config_key: "auto_trigger_checks", endpoint: "/repos/{owner}/{repo}/check-suites/preferences", method: "PATCH", json_path: "auto_trigger_checks" });
     map.insert("base", ApiFieldMapping { resource_type: "repo", config_key: "base", endpoint: "/repos/{owner}/{repo}/pulls/{pull_number}", method: "PATCH", json_path: "base" });
@@ -50,7 +48,7 @@ pub fn get_github_api_mapping() -> HashMap<&'static str, ApiFieldMapping> {
     map.insert("bio", ApiFieldMapping { resource_type: "user", config_key: "bio", endpoint: "/user", method: "PATCH", json_path: "bio" });
     map.insert("block_creations", ApiFieldMapping { resource_type: "repo", config_key: "block_creations", endpoint: "/repos/{owner}/{repo}/branches/{branch}/protection", method: "PUT", json_path: "block_creations" });
     map.insert("blog", ApiFieldMapping { resource_type: "user", config_key: "blog", endpoint: "/user", method: "PATCH", json_path: "blog" });
-    map.insert("body", ApiFieldMapping { resource_type: "user", config_key: "body", endpoint: "/user/projects", method: "POST", json_path: "body" });
+    map.insert("body", ApiFieldMapping { resource_type: "repo", config_key: "body", endpoint: "/repos/{owner}/{repo}/comments/{comment_id}", method: "PATCH", json_path: "body" });
     map.insert("branch", ApiFieldMapping { resource_type: "repo", config_key: "branch", endpoint: "/repos/{owner}/{repo}/merge-upstream", method: "POST", json_path: "branch" });
     map.insert("build_type", ApiFieldMapping { resource_type: "repo", config_key: "build_type", endpoint: "/repos/{owner}/{repo}/pages", method: "PUT", json_path: "build_type" });
     map.insert("bundle", ApiFieldMapping { resource_type: "repo", config_key: "bundle", endpoint: "/repos/{owner}/{repo}/attestations", method: "POST", json_path: "bundle" });
@@ -101,7 +99,7 @@ pub fn get_github_api_mapping() -> HashMap<&'static str, ApiFieldMapping> {
     map.insert("default_repository_permission", ApiFieldMapping { resource_type: "org", config_key: "default_repository_permission", endpoint: "/orgs/{org}", method: "PATCH", json_path: "default_repository_permission" });
     map.insert("default_value", ApiFieldMapping { resource_type: "org", config_key: "default_value", endpoint: "/orgs/{org}/properties/schema/{custom_property_name}", method: "PUT", json_path: "default_value" });
     map.insert("default_workflow_permissions", ApiFieldMapping { resource_type: "repo", config_key: "default_workflow_permissions", endpoint: "/repos/{owner}/{repo}/actions/permissions/workflow", method: "PUT", json_path: "default_workflow_permissions" });
-    map.insert("delete_branch_on_merge", ApiFieldMapping { resource_type: "user", config_key: "delete_branch_on_merge", endpoint: "/user/repos", method: "POST", json_path: "delete_branch_on_merge" });
+    map.insert("delete_branch_on_merge", ApiFieldMapping { resource_type: "repo", config_key: "delete_branch_on_merge", endpoint: "/repos/{owner}/{repo}", method: "PATCH", json_path: "delete_branch_on_merge" });
     map.insert("dependabot_alerts", ApiFieldMapping { resource_type: "org", config_key: "dependabot_alerts", endpoint: "/orgs/{org}/code-security/configurations/{configuration_id}", method: "PATCH", json_path: "dependabot_alerts" });
     map.insert("dependabot_alerts_enabled_for_new_repositories", ApiFieldMapping { resource_type: "org", config_key: "dependabot_alerts_enabled_for_new_repositories", endpoint: "/orgs/{org}", method: "PATCH", json_path: "dependabot_alerts_enabled_for_new_repositories" });
     map.insert("dependabot_security_updates", ApiFieldMapping { resource_type: "org", config_key: "dependabot_security_updates", endpoint: "/orgs/{org}/code-security/configurations/{configuration_id}", method: "PATCH", json_path: "dependabot_security_updates" });
@@ -112,19 +110,19 @@ pub fn get_github_api_mapping() -> HashMap<&'static str, ApiFieldMapping> {
     map.insert("dependency_graph_enabled_for_new_repositories", ApiFieldMapping { resource_type: "org", config_key: "dependency_graph_enabled_for_new_repositories", endpoint: "/orgs/{org}", method: "PATCH", json_path: "dependency_graph_enabled_for_new_repositories" });
     map.insert("deploy_keys_enabled_for_repositories", ApiFieldMapping { resource_type: "org", config_key: "deploy_keys_enabled_for_repositories", endpoint: "/orgs/{org}", method: "PATCH", json_path: "deploy_keys_enabled_for_repositories" });
     map.insert("deployment_branch_policy", ApiFieldMapping { resource_type: "repo", config_key: "deployment_branch_policy", endpoint: "/repos/{owner}/{repo}/environments/{environment_name}", method: "PUT", json_path: "deployment_branch_policy" });
-    map.insert("description", ApiFieldMapping { resource_type: "user", config_key: "description", endpoint: "/user/repos", method: "POST", json_path: "description" });
+    map.insert("description", ApiFieldMapping { resource_type: "repo", config_key: "description", endpoint: "/repos/{owner}/{repo}", method: "PATCH", json_path: "description" });
     map.insert("details_url", ApiFieldMapping { resource_type: "repo", config_key: "details_url", endpoint: "/repos/{owner}/{repo}/check-runs/{check_run_id}", method: "PATCH", json_path: "details_url" });
     map.insert("detector", ApiFieldMapping { resource_type: "repo", config_key: "detector", endpoint: "/repos/{owner}/{repo}/dependency-graph/snapshots", method: "POST", json_path: "detector" });
     map.insert("devcontainer_path", ApiFieldMapping { resource_type: "repo", config_key: "devcontainer_path", endpoint: "/repos/{owner}/{repo}/pulls/{pull_number}/codespaces", method: "POST", json_path: "devcontainer_path" });
     map.insert("discussion_category_name", ApiFieldMapping { resource_type: "repo", config_key: "discussion_category_name", endpoint: "/repos/{owner}/{repo}/releases/{release_id}", method: "PATCH", json_path: "discussion_category_name" });
     map.insert("dismiss_stale_reviews", ApiFieldMapping { resource_type: "repo", config_key: "dismiss_stale_reviews", endpoint: "/repos/{owner}/{repo}/branches/{branch}/protection/required_pull_request_reviews", method: "PATCH", json_path: "dismiss_stale_reviews" });
     map.insert("dismissal_restrictions", ApiFieldMapping { resource_type: "repo", config_key: "dismissal_restrictions", endpoint: "/repos/{owner}/{repo}/branches/{branch}/protection/required_pull_request_reviews", method: "PATCH", json_path: "dismissal_restrictions" });
-    map.insert("dismissed_comment", ApiFieldMapping { resource_type: "repo", config_key: "dismissed_comment", endpoint: "/repos/{owner}/{repo}/dependabot/alerts/{alert_number}", method: "PATCH", json_path: "dismissed_comment" });
-    map.insert("dismissed_reason", ApiFieldMapping { resource_type: "repo", config_key: "dismissed_reason", endpoint: "/repos/{owner}/{repo}/dependabot/alerts/{alert_number}", method: "PATCH", json_path: "dismissed_reason" });
+    map.insert("dismissed_comment", ApiFieldMapping { resource_type: "repo", config_key: "dismissed_comment", endpoint: "/repos/{owner}/{repo}/code-scanning/alerts/{alert_number}", method: "PATCH", json_path: "dismissed_comment" });
+    map.insert("dismissed_reason", ApiFieldMapping { resource_type: "repo", config_key: "dismissed_reason", endpoint: "/repos/{owner}/{repo}/code-scanning/alerts/{alert_number}", method: "PATCH", json_path: "dismissed_reason" });
     map.insert("display_name", ApiFieldMapping { resource_type: "user", config_key: "display_name", endpoint: "/user/codespaces/{codespace_name}", method: "PATCH", json_path: "display_name" });
     map.insert("draft", ApiFieldMapping { resource_type: "repo", config_key: "draft", endpoint: "/repos/{owner}/{repo}/releases/{release_id}", method: "PATCH", json_path: "draft" });
     map.insert("due_on", ApiFieldMapping { resource_type: "repo", config_key: "due_on", endpoint: "/repos/{owner}/{repo}/milestones/{milestone_number}", method: "PATCH", json_path: "due_on" });
-    map.insert("email", ApiFieldMapping { resource_type: "user", config_key: "email", endpoint: "/user", method: "PATCH", json_path: "email" });
+    map.insert("email", ApiFieldMapping { resource_type: "repo", config_key: "email", endpoint: "/repos/{owner}/{repo}/import/authors/{author_id}", method: "PATCH", json_path: "email" });
     map.insert("enable_debug_logging", ApiFieldMapping { resource_type: "repo", config_key: "enable_debug_logging", endpoint: "/repos/{owner}/{repo}/actions/runs/{run_id}/rerun-failed-jobs", method: "POST", json_path: "enable_debug_logging" });
     map.insert("enable_static_ip", ApiFieldMapping { resource_type: "org", config_key: "enable_static_ip", endpoint: "/orgs/{org}/actions/hosted-runners/{hosted_runner_id}", method: "PATCH", json_path: "enable_static_ip" });
     map.insert("enabled", ApiFieldMapping { resource_type: "repo", config_key: "enabled", endpoint: "/repos/{owner}/{repo}/actions/permissions", method: "PUT", json_path: "enabled" });
@@ -155,25 +153,25 @@ pub fn get_github_api_mapping() -> HashMap<&'static str, ApiFieldMapping> {
     map.insert("generate_release_notes", ApiFieldMapping { resource_type: "repo", config_key: "generate_release_notes", endpoint: "/repos/{owner}/{repo}/releases", method: "POST", json_path: "generate_release_notes" });
     map.insert("geo", ApiFieldMapping { resource_type: "repo", config_key: "geo", endpoint: "/repos/{owner}/{repo}/pulls/{pull_number}/codespaces", method: "POST", json_path: "geo" });
     map.insert("github_owned_allowed", ApiFieldMapping { resource_type: "repo", config_key: "github_owned_allowed", endpoint: "/repos/{owner}/{repo}/actions/permissions/selected-actions", method: "PUT", json_path: "github_owned_allowed" });
-    map.insert("gitignore_template", ApiFieldMapping { resource_type: "user", config_key: "gitignore_template", endpoint: "/user/repos", method: "POST", json_path: "gitignore_template" });
-    map.insert("has_discussions", ApiFieldMapping { resource_type: "user", config_key: "has_discussions", endpoint: "/user/repos", method: "POST", json_path: "has_discussions" });
-    map.insert("has_downloads", ApiFieldMapping { resource_type: "user", config_key: "has_downloads", endpoint: "/user/repos", method: "POST", json_path: "has_downloads" });
-    map.insert("has_issues", ApiFieldMapping { resource_type: "user", config_key: "has_issues", endpoint: "/user/repos", method: "POST", json_path: "has_issues" });
+    map.insert("gitignore_template", ApiFieldMapping { resource_type: "repo_create_user", config_key: "gitignore_template", endpoint: "/user/repos", method: "POST", json_path: "gitignore_template" });
+    map.insert("has_discussions", ApiFieldMapping { resource_type: "repo_create_user", config_key: "has_discussions", endpoint: "/user/repos", method: "POST", json_path: "has_discussions" });
+    map.insert("has_downloads", ApiFieldMapping { resource_type: "repo_create_user", config_key: "has_downloads", endpoint: "/user/repos", method: "POST", json_path: "has_downloads" });
+    map.insert("has_issues", ApiFieldMapping { resource_type: "repo", config_key: "has_issues", endpoint: "/repos/{owner}/{repo}", method: "PATCH", json_path: "has_issues" });
     map.insert("has_organization_projects", ApiFieldMapping { resource_type: "org", config_key: "has_organization_projects", endpoint: "/orgs/{org}", method: "PATCH", json_path: "has_organization_projects" });
-    map.insert("has_projects", ApiFieldMapping { resource_type: "user", config_key: "has_projects", endpoint: "/user/repos", method: "POST", json_path: "has_projects" });
+    map.insert("has_projects", ApiFieldMapping { resource_type: "repo", config_key: "has_projects", endpoint: "/repos/{owner}/{repo}", method: "PATCH", json_path: "has_projects" });
     map.insert("has_repository_projects", ApiFieldMapping { resource_type: "org", config_key: "has_repository_projects", endpoint: "/orgs/{org}", method: "PATCH", json_path: "has_repository_projects" });
-    map.insert("has_wiki", ApiFieldMapping { resource_type: "user", config_key: "has_wiki", endpoint: "/user/repos", method: "POST", json_path: "has_wiki" });
+    map.insert("has_wiki", ApiFieldMapping { resource_type: "repo", config_key: "has_wiki", endpoint: "/repos/{owner}/{repo}", method: "PATCH", json_path: "has_wiki" });
     map.insert("head", ApiFieldMapping { resource_type: "repo", config_key: "head", endpoint: "/repos/{owner}/{repo}/pulls", method: "POST", json_path: "head" });
     map.insert("head_repo", ApiFieldMapping { resource_type: "repo", config_key: "head_repo", endpoint: "/repos/{owner}/{repo}/pulls", method: "POST", json_path: "head_repo" });
     map.insert("head_sha", ApiFieldMapping { resource_type: "repo", config_key: "head_sha", endpoint: "/repos/{owner}/{repo}/check-suites", method: "POST", json_path: "head_sha" });
     map.insert("hireable", ApiFieldMapping { resource_type: "user", config_key: "hireable", endpoint: "/user", method: "PATCH", json_path: "hireable" });
-    map.insert("homepage", ApiFieldMapping { resource_type: "user", config_key: "homepage", endpoint: "/user/repos", method: "POST", json_path: "homepage" });
+    map.insert("homepage", ApiFieldMapping { resource_type: "repo", config_key: "homepage", endpoint: "/repos/{owner}/{repo}", method: "PATCH", json_path: "homepage" });
     map.insert("https_enforced", ApiFieldMapping { resource_type: "repo", config_key: "https_enforced", endpoint: "/repos/{owner}/{repo}/pages", method: "PUT", json_path: "https_enforced" });
     map.insert("idle_timeout_minutes", ApiFieldMapping { resource_type: "repo", config_key: "idle_timeout_minutes", endpoint: "/repos/{owner}/{repo}/pulls/{pull_number}/codespaces", method: "POST", json_path: "idle_timeout_minutes" });
     map.insert("ignored", ApiFieldMapping { resource_type: "repo", config_key: "ignored", endpoint: "/repos/{owner}/{repo}/subscription", method: "PUT", json_path: "ignored" });
     map.insert("image", ApiFieldMapping { resource_type: "org", config_key: "image", endpoint: "/orgs/{org}/actions/hosted-runners", method: "POST", json_path: "image" });
     map.insert("in_reply_to", ApiFieldMapping { resource_type: "repo", config_key: "in_reply_to", endpoint: "/repos/{owner}/{repo}/pulls/{pull_number}/comments", method: "POST", json_path: "in_reply_to" });
-    map.insert("include_all_branches", ApiFieldMapping { resource_type: "repo", config_key: "include_all_branches", endpoint: "/repos/{template_owner}/{template_repo}/generate", method: "POST", json_path: "include_all_branches" });
+    map.insert("include_all_branches", ApiFieldMapping { resource_type: "other", config_key: "include_all_branches", endpoint: "/repos/{template_owner}/{template_repo}/generate", method: "POST", json_path: "include_all_branches" });
     map.insert("include_claim_keys", ApiFieldMapping { resource_type: "repo", config_key: "include_claim_keys", endpoint: "/repos/{owner}/{repo}/actions/oidc/customization/sub", method: "PUT", json_path: "include_claim_keys" });
     map.insert("inputs", ApiFieldMapping { resource_type: "repo", config_key: "inputs", endpoint: "/repos/{owner}/{repo}/actions/workflows/{workflow_id}/dispatches", method: "POST", json_path: "inputs" });
     map.insert("insecure_ssl", ApiFieldMapping { resource_type: "repo", config_key: "insecure_ssl", endpoint: "/repos/{owner}/{repo}/hooks/{hook_id}/config", method: "PATCH", json_path: "insecure_ssl" });
@@ -181,7 +179,7 @@ pub fn get_github_api_mapping() -> HashMap<&'static str, ApiFieldMapping> {
     map.insert("invitee_id", ApiFieldMapping { resource_type: "org", config_key: "invitee_id", endpoint: "/orgs/{org}/invitations", method: "POST", json_path: "invitee_id" });
     map.insert("is_alphanumeric", ApiFieldMapping { resource_type: "repo", config_key: "is_alphanumeric", endpoint: "/repos/{owner}/{repo}/autolinks", method: "POST", json_path: "is_alphanumeric" });
     map.insert("is_enabled", ApiFieldMapping { resource_type: "org", config_key: "is_enabled", endpoint: "/orgs/{org}/issue-types/{issue_type_id}", method: "PUT", json_path: "is_enabled" });
-    map.insert("is_template", ApiFieldMapping { resource_type: "user", config_key: "is_template", endpoint: "/user/repos", method: "POST", json_path: "is_template" });
+    map.insert("is_template", ApiFieldMapping { resource_type: "repo", config_key: "is_template", endpoint: "/repos/{owner}/{repo}", method: "PATCH", json_path: "is_template" });
     map.insert("issue", ApiFieldMapping { resource_type: "repo", config_key: "issue", endpoint: "/repos/{owner}/{repo}/pulls", method: "POST", json_path: "issue" });
     map.insert("job", ApiFieldMapping { resource_type: "repo", config_key: "job", endpoint: "/repos/{owner}/{repo}/dependency-graph/snapshots", method: "POST", json_path: "job" });
     map.insert("key", ApiFieldMapping { resource_type: "user", config_key: "key", endpoint: "/user/ssh_signing_keys", method: "POST", json_path: "key" });
@@ -192,7 +190,7 @@ pub fn get_github_api_mapping() -> HashMap<&'static str, ApiFieldMapping> {
     map.insert("language", ApiFieldMapping { resource_type: "repo", config_key: "language", endpoint: "/repos/{owner}/{repo}/code-scanning/codeql/variant-analyses", method: "POST", json_path: "language" });
     map.insert("languages", ApiFieldMapping { resource_type: "repo", config_key: "languages", endpoint: "/repos/{owner}/{repo}/code-scanning/default-setup", method: "PATCH", json_path: "languages" });
     map.insert("last_read_at", ApiFieldMapping { resource_type: "repo", config_key: "last_read_at", endpoint: "/repos/{owner}/{repo}/notifications", method: "PUT", json_path: "last_read_at" });
-    map.insert("license_template", ApiFieldMapping { resource_type: "user", config_key: "license_template", endpoint: "/user/repos", method: "POST", json_path: "license_template" });
+    map.insert("license_template", ApiFieldMapping { resource_type: "repo_create_user", config_key: "license_template", endpoint: "/user/repos", method: "POST", json_path: "license_template" });
     map.insert("limit", ApiFieldMapping { resource_type: "user", config_key: "limit", endpoint: "/user/interaction-limits", method: "PUT", json_path: "limit" });
     map.insert("line", ApiFieldMapping { resource_type: "repo", config_key: "line", endpoint: "/repos/{owner}/{repo}/pulls/{pull_number}/comments", method: "POST", json_path: "line" });
     map.insert("location", ApiFieldMapping { resource_type: "user", config_key: "location", endpoint: "/user", method: "PATCH", json_path: "location" });
@@ -216,19 +214,19 @@ pub fn get_github_api_mapping() -> HashMap<&'static str, ApiFieldMapping> {
     map.insert("members_can_create_public_repositories", ApiFieldMapping { resource_type: "org", config_key: "members_can_create_public_repositories", endpoint: "/orgs/{org}", method: "PATCH", json_path: "members_can_create_public_repositories" });
     map.insert("members_can_create_repositories", ApiFieldMapping { resource_type: "org", config_key: "members_can_create_repositories", endpoint: "/orgs/{org}", method: "PATCH", json_path: "members_can_create_repositories" });
     map.insert("members_can_fork_private_repositories", ApiFieldMapping { resource_type: "org", config_key: "members_can_fork_private_repositories", endpoint: "/orgs/{org}", method: "PATCH", json_path: "members_can_fork_private_repositories" });
-    map.insert("merge_commit_message", ApiFieldMapping { resource_type: "user", config_key: "merge_commit_message", endpoint: "/user/repos", method: "POST", json_path: "merge_commit_message" });
-    map.insert("merge_commit_title", ApiFieldMapping { resource_type: "user", config_key: "merge_commit_title", endpoint: "/user/repos", method: "POST", json_path: "merge_commit_title" });
+    map.insert("merge_commit_message", ApiFieldMapping { resource_type: "repo", config_key: "merge_commit_message", endpoint: "/repos/{owner}/{repo}", method: "PATCH", json_path: "merge_commit_message" });
+    map.insert("merge_commit_title", ApiFieldMapping { resource_type: "repo", config_key: "merge_commit_title", endpoint: "/repos/{owner}/{repo}", method: "PATCH", json_path: "merge_commit_title" });
     map.insert("merge_method", ApiFieldMapping { resource_type: "repo", config_key: "merge_method", endpoint: "/repos/{owner}/{repo}/pulls/{pull_number}/merge", method: "PUT", json_path: "merge_method" });
     map.insert("message", ApiFieldMapping { resource_type: "repo", config_key: "message", endpoint: "/repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}/dismissals", method: "PUT", json_path: "message" });
     map.insert("metadata", ApiFieldMapping { resource_type: "repo", config_key: "metadata", endpoint: "/repos/{owner}/{repo}/dependency-graph/snapshots", method: "POST", json_path: "metadata" });
     map.insert("milestone", ApiFieldMapping { resource_type: "repo", config_key: "milestone", endpoint: "/repos/{owner}/{repo}/issues/{issue_number}", method: "PATCH", json_path: "milestone" });
     map.insert("mode", ApiFieldMapping { resource_type: "other", config_key: "mode", endpoint: "/markdown", method: "POST", json_path: "mode" });
     map.insert("multi_repo_permissions_opt_out", ApiFieldMapping { resource_type: "repo", config_key: "multi_repo_permissions_opt_out", endpoint: "/repos/{owner}/{repo}/pulls/{pull_number}/codespaces", method: "POST", json_path: "multi_repo_permissions_opt_out" });
-    map.insert("name", ApiFieldMapping { resource_type: "user", config_key: "name", endpoint: "/user/repos", method: "POST", json_path: "name" });
+    map.insert("name", ApiFieldMapping { resource_type: "repo", config_key: "name", endpoint: "/repos/{owner}/{repo}", method: "PATCH", json_path: "name" });
     map.insert("names", ApiFieldMapping { resource_type: "repo", config_key: "names", endpoint: "/repos/{owner}/{repo}/topics", method: "PUT", json_path: "names" });
     map.insert("network_configuration_id", ApiFieldMapping { resource_type: "org", config_key: "network_configuration_id", endpoint: "/orgs/{org}/actions/runner-groups/{runner_group_id}", method: "PATCH", json_path: "network_configuration_id" });
     map.insert("network_settings_ids", ApiFieldMapping { resource_type: "org", config_key: "network_settings_ids", endpoint: "/orgs/{org}/settings/network-configurations/{network_configuration_id}", method: "PATCH", json_path: "network_settings_ids" });
-    map.insert("new_name", ApiFieldMapping { resource_type: "repo", config_key: "new_name", endpoint: "/repos/{owner}/{repo}/transfer", method: "POST", json_path: "new_name" });
+    map.insert("new_name", ApiFieldMapping { resource_type: "repo", config_key: "new_name", endpoint: "/repos/{owner}/{repo}/labels/{name}", method: "PATCH", json_path: "new_name" });
     map.insert("new_owner", ApiFieldMapping { resource_type: "repo", config_key: "new_owner", endpoint: "/repos/{owner}/{repo}/transfer", method: "POST", json_path: "new_owner" });
     map.insert("note", ApiFieldMapping { resource_type: "project", config_key: "note", endpoint: "/projects/columns/cards/{card_id}", method: "PATCH", json_path: "note" });
     map.insert("notification_setting", ApiFieldMapping { resource_type: "team", config_key: "notification_setting", endpoint: "/teams/{team_id}", method: "PATCH", json_path: "notification_setting" });
@@ -238,7 +236,7 @@ pub fn get_github_api_mapping() -> HashMap<&'static str, ApiFieldMapping> {
     map.insert("organization", ApiFieldMapping { resource_type: "repo", config_key: "organization", endpoint: "/repos/{owner}/{repo}/forks", method: "POST", json_path: "organization" });
     map.insert("organization_permission", ApiFieldMapping { resource_type: "project", config_key: "organization_permission", endpoint: "/projects/{project_id}", method: "PATCH", json_path: "organization_permission" });
     map.insert("output", ApiFieldMapping { resource_type: "repo", config_key: "output", endpoint: "/repos/{owner}/{repo}/check-runs/{check_run_id}", method: "PATCH", json_path: "output" });
-    map.insert("owner", ApiFieldMapping { resource_type: "repo", config_key: "owner", endpoint: "/repos/{template_owner}/{template_repo}/generate", method: "POST", json_path: "owner" });
+    map.insert("owner", ApiFieldMapping { resource_type: "other", config_key: "owner", endpoint: "/repos/{template_owner}/{template_repo}/generate", method: "POST", json_path: "owner" });
     map.insert("pages_build_version", ApiFieldMapping { resource_type: "repo", config_key: "pages_build_version", endpoint: "/repos/{owner}/{repo}/pages/deployments", method: "POST", json_path: "pages_build_version" });
     map.insert("parent_team_id", ApiFieldMapping { resource_type: "team", config_key: "parent_team_id", endpoint: "/teams/{team_id}", method: "PATCH", json_path: "parent_team_id" });
     map.insert("parents", ApiFieldMapping { resource_type: "repo", config_key: "parents", endpoint: "/repos/{owner}/{repo}/git/commits", method: "POST", json_path: "parents" });
@@ -256,7 +254,7 @@ pub fn get_github_api_mapping() -> HashMap<&'static str, ApiFieldMapping> {
     map.insert("prevent_self_review", ApiFieldMapping { resource_type: "repo", config_key: "prevent_self_review", endpoint: "/repos/{owner}/{repo}/environments/{environment_name}", method: "PUT", json_path: "prevent_self_review" });
     map.insert("previous_tag_name", ApiFieldMapping { resource_type: "repo", config_key: "previous_tag_name", endpoint: "/repos/{owner}/{repo}/releases/generate-notes", method: "POST", json_path: "previous_tag_name" });
     map.insert("privacy", ApiFieldMapping { resource_type: "team", config_key: "privacy", endpoint: "/teams/{team_id}", method: "PATCH", json_path: "privacy" });
-    map.insert("private", ApiFieldMapping { resource_type: "user", config_key: "private", endpoint: "/user/repos", method: "POST", json_path: "private" });
+    map.insert("private", ApiFieldMapping { resource_type: "repo", config_key: "private", endpoint: "/repos/{owner}/{repo}", method: "PATCH", json_path: "private" });
     map.insert("private_vulnerability_reporting", ApiFieldMapping { resource_type: "org", config_key: "private_vulnerability_reporting", endpoint: "/orgs/{org}/code-security/configurations/{configuration_id}", method: "PATCH", json_path: "private_vulnerability_reporting" });
     map.insert("production_environment", ApiFieldMapping { resource_type: "repo", config_key: "production_environment", endpoint: "/repos/{owner}/{repo}/deployments", method: "POST", json_path: "production_environment" });
     map.insert("properties", ApiFieldMapping { resource_type: "repo", config_key: "properties", endpoint: "/repos/{owner}/{repo}/properties/values", method: "PATCH", json_path: "properties" });
@@ -320,18 +318,18 @@ pub fn get_github_api_mapping() -> HashMap<&'static str, ApiFieldMapping> {
     map.insert("selected_usernames", ApiFieldMapping { resource_type: "org", config_key: "selected_usernames", endpoint: "/orgs/{org}/copilot/billing/selected_users", method: "POST", json_path: "selected_usernames" });
     map.insert("selected_workflows", ApiFieldMapping { resource_type: "org", config_key: "selected_workflows", endpoint: "/orgs/{org}/actions/runner-groups/{runner_group_id}", method: "PATCH", json_path: "selected_workflows" });
     map.insert("severity", ApiFieldMapping { resource_type: "repo", config_key: "severity", endpoint: "/repos/{owner}/{repo}/security-advisories/{ghsa_id}", method: "PATCH", json_path: "severity" });
-    map.insert("sha", ApiFieldMapping { resource_type: "repo", config_key: "sha", endpoint: "/repos/{owner}/{repo}/pulls/{pull_number}/merge", method: "PUT", json_path: "sha" });
+    map.insert("sha", ApiFieldMapping { resource_type: "repo", config_key: "sha", endpoint: "/repos/{owner}/{repo}/git/refs/{ref}", method: "PATCH", json_path: "sha" });
     map.insert("side", ApiFieldMapping { resource_type: "repo", config_key: "side", endpoint: "/repos/{owner}/{repo}/pulls/{pull_number}/comments", method: "POST", json_path: "side" });
     map.insert("signature", ApiFieldMapping { resource_type: "repo", config_key: "signature", endpoint: "/repos/{owner}/{repo}/git/commits", method: "POST", json_path: "signature" });
     map.insert("size", ApiFieldMapping { resource_type: "org", config_key: "size", endpoint: "/orgs/{org}/actions/hosted-runners", method: "POST", json_path: "size" });
     map.insert("source", ApiFieldMapping { resource_type: "repo", config_key: "source", endpoint: "/repos/{owner}/{repo}/pages", method: "PUT", json_path: "source" });
-    map.insert("squash_merge_commit_message", ApiFieldMapping { resource_type: "user", config_key: "squash_merge_commit_message", endpoint: "/user/repos", method: "POST", json_path: "squash_merge_commit_message" });
-    map.insert("squash_merge_commit_title", ApiFieldMapping { resource_type: "user", config_key: "squash_merge_commit_title", endpoint: "/user/repos", method: "POST", json_path: "squash_merge_commit_title" });
+    map.insert("squash_merge_commit_message", ApiFieldMapping { resource_type: "repo", config_key: "squash_merge_commit_message", endpoint: "/repos/{owner}/{repo}", method: "PATCH", json_path: "squash_merge_commit_message" });
+    map.insert("squash_merge_commit_title", ApiFieldMapping { resource_type: "repo", config_key: "squash_merge_commit_title", endpoint: "/repos/{owner}/{repo}", method: "PATCH", json_path: "squash_merge_commit_title" });
     map.insert("start_line", ApiFieldMapping { resource_type: "repo", config_key: "start_line", endpoint: "/repos/{owner}/{repo}/pulls/{pull_number}/comments", method: "POST", json_path: "start_line" });
     map.insert("start_private_fork", ApiFieldMapping { resource_type: "repo", config_key: "start_private_fork", endpoint: "/repos/{owner}/{repo}/security-advisories/reports", method: "POST", json_path: "start_private_fork" });
     map.insert("start_side", ApiFieldMapping { resource_type: "repo", config_key: "start_side", endpoint: "/repos/{owner}/{repo}/pulls/{pull_number}/comments", method: "POST", json_path: "start_side" });
-    map.insert("started_at", ApiFieldMapping { resource_type: "repo", config_key: "started_at", endpoint: "/repos/{owner}/{repo}/code-scanning/sarifs", method: "POST", json_path: "started_at" });
-    map.insert("state", ApiFieldMapping { resource_type: "user", config_key: "state", endpoint: "/user/memberships/orgs/{org}", method: "PATCH", json_path: "state" });
+    map.insert("started_at", ApiFieldMapping { resource_type: "repo", config_key: "started_at", endpoint: "/repos/{owner}/{repo}/check-runs/{check_run_id}", method: "PATCH", json_path: "started_at" });
+    map.insert("state", ApiFieldMapping { resource_type: "repo", config_key: "state", endpoint: "/repos/{owner}/{repo}/code-scanning/alerts/{alert_number}", method: "PATCH", json_path: "state" });
     map.insert("state_reason", ApiFieldMapping { resource_type: "repo", config_key: "state_reason", endpoint: "/repos/{owner}/{repo}/issues/{issue_number}", method: "PATCH", json_path: "state_reason" });
     map.insert("status", ApiFieldMapping { resource_type: "repo", config_key: "status", endpoint: "/repos/{owner}/{repo}/check-runs/{check_run_id}", method: "PATCH", json_path: "status" });
     map.insert("strict", ApiFieldMapping { resource_type: "repo", config_key: "strict", endpoint: "/repos/{owner}/{repo}/branches/{branch}/protection/required_status_checks", method: "PATCH", json_path: "strict" });
@@ -348,13 +346,13 @@ pub fn get_github_api_mapping() -> HashMap<&'static str, ApiFieldMapping> {
     map.insert("target_ref", ApiFieldMapping { resource_type: "repo", config_key: "target_ref", endpoint: "/repos/{owner}/{repo}/code-scanning/alerts/{alert_number}/autofix/commits", method: "POST", json_path: "target_ref" });
     map.insert("target_url", ApiFieldMapping { resource_type: "repo", config_key: "target_url", endpoint: "/repos/{owner}/{repo}/statuses/{sha}", method: "POST", json_path: "target_url" });
     map.insert("task", ApiFieldMapping { resource_type: "repo", config_key: "task", endpoint: "/repos/{owner}/{repo}/deployments", method: "POST", json_path: "task" });
-    map.insert("team_id", ApiFieldMapping { resource_type: "user", config_key: "team_id", endpoint: "/user/repos", method: "POST", json_path: "team_id" });
+    map.insert("team_id", ApiFieldMapping { resource_type: "repo_create_user", config_key: "team_id", endpoint: "/user/repos", method: "POST", json_path: "team_id" });
     map.insert("team_ids", ApiFieldMapping { resource_type: "repo", config_key: "team_ids", endpoint: "/repos/{owner}/{repo}/transfer", method: "POST", json_path: "team_ids" });
     map.insert("team_managers", ApiFieldMapping { resource_type: "org", config_key: "team_managers", endpoint: "/orgs/{org}/campaigns/{campaign_number}", method: "PATCH", json_path: "team_managers" });
     map.insert("team_reviewers", ApiFieldMapping { resource_type: "repo", config_key: "team_reviewers", endpoint: "/repos/{owner}/{repo}/pulls/{pull_number}/requested_reviewers", method: "POST", json_path: "team_reviewers" });
     map.insert("text", ApiFieldMapping { resource_type: "other", config_key: "text", endpoint: "/markdown", method: "POST", json_path: "text" });
-    map.insert("tfvc_project", ApiFieldMapping { resource_type: "repo", config_key: "tfvc_project", endpoint: "/repos/{owner}/{repo}/import", method: "PUT", json_path: "tfvc_project" });
-    map.insert("title", ApiFieldMapping { resource_type: "user", config_key: "title", endpoint: "/user/ssh_signing_keys", method: "POST", json_path: "title" });
+    map.insert("tfvc_project", ApiFieldMapping { resource_type: "repo", config_key: "tfvc_project", endpoint: "/repos/{owner}/{repo}/import", method: "PATCH", json_path: "tfvc_project" });
+    map.insert("title", ApiFieldMapping { resource_type: "repo", config_key: "title", endpoint: "/repos/{owner}/{repo}/issues/{issue_number}", method: "PATCH", json_path: "title" });
     map.insert("tool_name", ApiFieldMapping { resource_type: "repo", config_key: "tool_name", endpoint: "/repos/{owner}/{repo}/code-scanning/sarifs", method: "POST", json_path: "tool_name" });
     map.insert("transient_environment", ApiFieldMapping { resource_type: "repo", config_key: "transient_environment", endpoint: "/repos/{owner}/{repo}/deployments", method: "POST", json_path: "transient_environment" });
     map.insert("tree", ApiFieldMapping { resource_type: "repo", config_key: "tree", endpoint: "/repos/{owner}/{repo}/git/trees", method: "POST", json_path: "tree" });
@@ -368,16 +366,16 @@ pub fn get_github_api_mapping() -> HashMap<&'static str, ApiFieldMapping> {
     map.insert("username", ApiFieldMapping { resource_type: "org", config_key: "username", endpoint: "/orgs/{org}/private-registries/{secret_name}", method: "PATCH", json_path: "username" });
     map.insert("users", ApiFieldMapping { resource_type: "repo", config_key: "users", endpoint: "/repos/{owner}/{repo}/branches/{branch}/protection/restrictions/users", method: "PUT", json_path: "users" });
     map.insert("validate", ApiFieldMapping { resource_type: "repo", config_key: "validate", endpoint: "/repos/{owner}/{repo}/code-scanning/sarifs", method: "POST", json_path: "validate" });
-    map.insert("value", ApiFieldMapping { resource_type: "repo", config_key: "value", endpoint: "/repos/{owner}/{repo}/environments/{environment_name}/variables/{name}", method: "PATCH", json_path: "value" });
+    map.insert("value", ApiFieldMapping { resource_type: "repo", config_key: "value", endpoint: "/repos/{owner}/{repo}/actions/variables/{name}", method: "PATCH", json_path: "value" });
     map.insert("value_type", ApiFieldMapping { resource_type: "org", config_key: "value_type", endpoint: "/orgs/{org}/properties/schema/{custom_property_name}", method: "PUT", json_path: "value_type" });
     map.insert("values_editable_by", ApiFieldMapping { resource_type: "org", config_key: "values_editable_by", endpoint: "/orgs/{org}/properties/schema/{custom_property_name}", method: "PUT", json_path: "values_editable_by" });
-    map.insert("vcs", ApiFieldMapping { resource_type: "repo", config_key: "vcs", endpoint: "/repos/{owner}/{repo}/import", method: "PUT", json_path: "vcs" });
-    map.insert("vcs_password", ApiFieldMapping { resource_type: "repo", config_key: "vcs_password", endpoint: "/repos/{owner}/{repo}/import", method: "PUT", json_path: "vcs_password" });
+    map.insert("vcs", ApiFieldMapping { resource_type: "repo", config_key: "vcs", endpoint: "/repos/{owner}/{repo}/import", method: "PATCH", json_path: "vcs" });
+    map.insert("vcs_password", ApiFieldMapping { resource_type: "repo", config_key: "vcs_password", endpoint: "/repos/{owner}/{repo}/import", method: "PATCH", json_path: "vcs_password" });
     map.insert("vcs_url", ApiFieldMapping { resource_type: "repo", config_key: "vcs_url", endpoint: "/repos/{owner}/{repo}/import", method: "PUT", json_path: "vcs_url" });
-    map.insert("vcs_username", ApiFieldMapping { resource_type: "repo", config_key: "vcs_username", endpoint: "/repos/{owner}/{repo}/import", method: "PUT", json_path: "vcs_username" });
+    map.insert("vcs_username", ApiFieldMapping { resource_type: "repo", config_key: "vcs_username", endpoint: "/repos/{owner}/{repo}/import", method: "PATCH", json_path: "vcs_username" });
     map.insert("verified_allowed", ApiFieldMapping { resource_type: "repo", config_key: "verified_allowed", endpoint: "/repos/{owner}/{repo}/actions/permissions/selected-actions", method: "PUT", json_path: "verified_allowed" });
     map.insert("version", ApiFieldMapping { resource_type: "repo", config_key: "version", endpoint: "/repos/{owner}/{repo}/dependency-graph/snapshots", method: "POST", json_path: "version" });
-    map.insert("visibility", ApiFieldMapping { resource_type: "user", config_key: "visibility", endpoint: "/user/email/visibility", method: "PATCH", json_path: "visibility" });
+    map.insert("visibility", ApiFieldMapping { resource_type: "repo", config_key: "visibility", endpoint: "/repos/{owner}/{repo}", method: "PATCH", json_path: "visibility" });
     map.insert("vulnerabilities", ApiFieldMapping { resource_type: "repo", config_key: "vulnerabilities", endpoint: "/repos/{owner}/{repo}/security-advisories/{ghsa_id}", method: "PATCH", json_path: "vulnerabilities" });
     map.insert("wait_timer", ApiFieldMapping { resource_type: "repo", config_key: "wait_timer", endpoint: "/repos/{owner}/{repo}/environments/{environment_name}", method: "PUT", json_path: "wait_timer" });
     map.insert("web_commit_signoff_required", ApiFieldMapping { resource_type: "repo", config_key: "web_commit_signoff_required", endpoint: "/repos/{owner}/{repo}", method: "PATCH", json_path: "web_commit_signoff_required" });
