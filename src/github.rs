@@ -588,6 +588,42 @@ impl GitHubClient {
         Ok(())
     }
 
+        // Add a helper for DELETE
+    async fn send_delete(&self, url: &str) -> AppResult<()> {
+        debug!("Attempting to build DELETE request for URL: '{}'", url);
+        // Add token/URL checks if desired
+        let response = self
+            .client
+            .delete(url)
+            .header(reqwest::header::AUTHORIZATION, format!("Bearer {}", self.token))
+            .header(reqwest::header::ACCEPT, "application/vnd.github+json")
+            .header(reqwest::header::USER_AGENT, "gh-config")
+            .send()
+            .await?;
+
+        let status = response.status();
+        debug!("DELETE {} returned status: {}", url, status);
+        // DELETE for membership returns 204 No Content on success
+        if status.is_success() || status == reqwest::StatusCode::NO_CONTENT {
+            Ok(())
+        } else {
+            let text = response.text().await?;
+            error!("DELETE {} failed with status {}: {}", url, status, text);
+            Err(AppError::GitHubApi(text))
+        }
+    }
+
+    // Add a helper to get team members
+    async fn get_team_members(&self, team_slug: &str) -> AppResult<HashSet<String>> {
+        let url = format!("https://api.github.com/orgs/{}/teams/{}/members?per_page=100", self.org, team_slug);
+        let response = self.get(&url).await?;
+        let members_json: Vec<serde_json::Value> = response.json().await.map_err(AppError::Http)?;
+        let members = members_json.iter()
+            .filter_map(|m| m["login"].as_str().map(String::from))
+            .collect::<HashSet<String>>();
+        Ok(members)
+    }
+
     ///
     /// Create a team in the GitHub organization and add members.
     ///
@@ -602,53 +638,70 @@ impl GitHubClient {
     /// * `Err(AppError)` if any API call fails.
     ///
     pub async fn create_team(&self, team: &Team, dry_run: bool) -> AppResult<()> {
-        let existing = self.get_team(&team.name).await?;
-        if dry_run {
-            if existing.is_none() {
-                info!("[Dry Run] Would create team: {}", team.name);
-                info!(
-                    "[Dry Run] Would add members to {}: {:?}",
-                    team.name, team.members
-                );
+        let url_create = format!("https://api.github.com/orgs/{}/teams", self.org); // For POST
+        let team_slug = &team.name; // Assuming name is slug for now
+    
+        let existing_team = self.get_team(team_slug).await?;
+    
+        if existing_team.is_none() {
+            // --- Create Team ---
+            if dry_run {
+                info!("[Dry Run] Would create team: {}", team_slug);
+                for member in &team.members {
+                   info!("[Dry Run] Would add {} to team {}", member, team_slug);
+                }
             } else {
-                debug!("[Dry Run] Team {} already exists", team.name);
-                info!(
-                    "[Dry Run] Would ensure members in {}: {:?}",
-                    team.name, team.members
-                );
-            }
-            Ok(())
-        } else if existing.is_none() {
-            let full_url = format!("{}/orgs/{}/teams", GITHUB_API_BASE_URL, self.org);
-            let body = json!({
-                "name": team.name,
-                "privacy": "closed"
-            });
-            info!("Creating team: {}", team.name);
-            self.send_post(&full_url, body).await?;
-            for member in &team.members {
-                let member_full_url = format!(
-                    "{}/orgs/{}/teams/{}/memberships/{}",
-                    GITHUB_API_BASE_URL, self.org, team.name, member
-                );
-                self.send_put(&member_full_url, None).await?;
-                info!("Added {} to team {}", member, team.name);
-            }
-            Ok(())
-        } else {
-            info!("Team {} already exists, updating members", team.name);
-            for member in &team.members {
-                let member_full_url = format!(
-                    "{}/orgs/{}/teams/{}/memberships/{}",
-                    GITHUB_API_BASE_URL, self.org, team.name, member
-                );
-                match self.send_put(&member_full_url, None).await {
-                    Ok(()) => info!("Added or confirmed {} in team {}", member, team.name),
-                    Err(e) => error!("Failed to add {} to team {}: {}", member, team.name, e),
+                info!("Creating team: {}", team_slug);
+                let body = json!({"name": team.name, "privacy": "closed"}); // Use team.name for creation
+                self.send_post(&url_create, body).await?;
+                for member in &team.members {
+                    let member_url = format!("https://api.github.com/orgs/{}/teams/{}/memberships/{}", self.org, team_slug, member);
+                    // Use PUT for initial add too, it works as add/update
+                    match self.send_put(&member_url, Some(json!({"role": "member"}))).await { // Specify role maybe? GitHub default is member
+                        Ok(()) => info!("Added {} to new team {}", member, team_slug),
+                        Err(e) => error!("Failed to add {} to new team {}: {}", member, team_slug, e),
+                    }
                 }
             }
-            Ok(())
+        } else {
+             // --- Update Existing Team Members ---
+             info!("Team {} already exists, syncing members", team_slug);
+    
+             let config_members: HashSet<String> = team.members.iter().cloned().collect();
+             let github_members = self.get_team_members(team_slug).await?;
+    
+             let members_to_add = config_members.difference(&github_members);
+             let members_to_remove = github_members.difference(&config_members);
+    
+             for member in members_to_add {
+                 let member_url = format!("https://api.github.com/orgs/{}/teams/{}/memberships/{}", self.org, team_slug, member);
+                if dry_run {
+                    info!("[Dry Run] Would add {} to team {}", member, team_slug);
+                } else {
+                    match self.send_put(&member_url, Some(json!({"role": "member"}))).await {
+                         Ok(()) => info!("Added {} to team {}", member, team_slug),
+                         Err(e) => error!("Failed to add {} to team {}: {}", member, team_slug, e),
+                     }
+                }
+             }
+    
+             for member in members_to_remove {
+                  let member_url = format!("https://api.github.com/orgs/{}/teams/{}/memberships/{}", self.org, team_slug, member);
+                 if dry_run {
+                     info!("[Dry Run] Would remove {} from team {}", member, team_slug);
+                 } else {
+                     match self.send_delete(&member_url).await {
+                         Ok(()) => info!("Removed {} from team {}", member, team_slug),
+                         Err(e) => error!("Failed to remove {} from team {}: {}", member, team_slug, e),
+                     }
+                 }
+             }
+    
+              if config_members == github_members {
+                   debug!("Team {} members already match config.", team_slug);
+              }
         }
+        Ok(())
     }
 
     ///
