@@ -17,6 +17,8 @@ use log::{debug, info, error};
 use reqwest::Client;
 use serde_json::json;
 use serde::{Deserialize, Serialize};
+use serde_yaml::Value; // Make sure Value is imported
+use std::collections::{HashMap, HashSet}; // Added HashSet
 use similar::{ChangeTag, TextDiff};
 use std::fs::File;
 use std::io::Write;
@@ -714,57 +716,80 @@ impl GitHubClient {
 
     pub async fn generate_config_and_write(&self, config_path: &str, dry_run: bool) -> AppResult<()> {
         info!("Generating config from GitHub org: {}", self.org);
-        let config = self.generate_config_from_org().await?;
+        let config = self.generate_unfiltered_config_from_org().await?;  // Make sure to call an unfiltered version
 
-        let mut yaml_content = String::new();
-        yaml_content.push_str(&format!("org: {}\n\n", config.org));
+        // ... rest of the YAML writing logic ...
+        // (Ensure this part uses the full, unfiltered config)
 
-        let mut assignments = config.assignments.clone();
-        assignments.sort_by(|a, b| a.team.cmp(&b.team).then(a.repo.cmp(&b.repo)));
-        if !assignments.is_empty() {
-            yaml_content.push_str("assignments:\n");
-            for assignment in &assignments {
-                yaml_content.push_str(&format!(
-                    "- repo: {}\n  team: {}\n  permission: {}\n",
-                    assignment.repo, assignment.team, assignment.permission
-                ));
-            }
-            yaml_content.push_str("\n");
-        } else {
-            yaml_content.push_str("assignments: []\n\n");
-        }
+         let mut yaml_content = String::new();
+         yaml_content.push_str(&format!("org: {}\n\n", config.org));
 
-        if let Some(default_webhook) = &config.default_webhook {
-            yaml_content.push_str("default_webhook:\n");
-            yaml_content.push_str(&format!("  url: {}\n", default_webhook.url));
-            yaml_content.push_str(&format!("  content_type: {}\n", default_webhook.content_type));
-            yaml_content.push_str("  events:\n");
-            let mut events = default_webhook.events.clone();
-            events.sort();
-            for event in &events {
-                yaml_content.push_str(&format!("  - {}\n", event));
-            }
-            yaml_content.push_str("\n");
-        }
+         // Add assignments (sorted)
+         let mut assignments = config.assignments;
+         assignments.sort_by(|a, b| a.team.cmp(&b.team).then(a.repo.cmp(&b.repo)));
+         if !assignments.is_empty() {
+              yaml_content.push_str("assignments:\n");
+              for assignment in &assignments {
+                  yaml_content.push_str(&format!(
+                      "- repo: {}\n  team: {}\n  permission: {}\n",
+                      assignment.repo, assignment.team, assignment.permission
+                  ));
+              }
+              yaml_content.push_str("\n");
+         } else {
+             yaml_content.push_str("assignments: []\n\n");
+         }
 
-        let mut repos = config.repos.clone();
-        repos.sort_by(|a, b| a.name.cmp(&b.name));
-        if !repos.is_empty() {
-            yaml_content.push_str("repos:\n");
-            for repo in &repos {
-                yaml_content.push_str(&format!("- name: {}\n", repo.name));
-                yaml_content.push_str("  settings:\n");
-                let amc = repo.settings.get("allow_merge_commit").map(|v| v.as_bool().unwrap_or(false)).unwrap_or(false);
-                let asm = repo.settings.get("allow_squash_merge").map(|v| v.as_bool().unwrap_or(false)).unwrap_or(false);
-                let arm = repo.settings.get("allow_rebase_merge").map(|v| v.as_bool().unwrap_or(false)).unwrap_or(false);
-                yaml_content.push_str(&format!("    allow_merge_commit: {}\n", amc));
-                yaml_content.push_str(&format!("    allow_squash_merge: {}\n", asm));
-                yaml_content.push_str(&format!("    allow_rebase_merge: {}\n", arm));
-                if let Some(visibility) = &repo.visibility {
-                    yaml_content.push_str(&format!("  visibility: {}\n", visibility));
-                }
-                if let Some(webhook) = &repo.webhook {
-                    if config.default_webhook.as_ref() != Some(webhook) {
+         // Add default webhook if present
+         if let Some(default_webhook) = &config.default_webhook {
+             yaml_content.push_str("default_webhook:\n");
+             yaml_content.push_str(&format!("  url: {}\n", default_webhook.url));
+             yaml_content.push_str(&format!("  content_type: {}\n", default_webhook.content_type));
+             yaml_content.push_str("  events:\n");
+             let mut events = default_webhook.events.clone();
+             events.sort();
+             for event in &events {
+                 yaml_content.push_str(&format!("  - {}\n", event));
+             }
+             yaml_content.push_str("\n");
+         }
+
+         // Add repos (sorted)
+         let mut repos = config.repos;
+         repos.sort_by(|a, b| a.name.cmp(&b.name));
+         if !repos.is_empty() {
+             yaml_content.push_str("repos:\n");
+             for repo in &repos {
+                 yaml_content.push_str(&format!("- name: {}\n", repo.name));
+
+                 // Only write settings actually fetched/relevant (potentially limited set here)
+                 if !repo.settings.is_empty() {
+                       yaml_content.push_str("  settings:\n");
+                       // Example: Write only specific known settings for cleaner output
+                       let keys_to_write = ["allow_merge_commit", "allow_squash_merge", "allow_rebase_merge"];
+                       let mut setting_keys: Vec<_> = repo.settings.keys().collect();
+                       setting_keys.sort(); // Sort keys within settings
+                       for key in setting_keys {
+                           if keys_to_write.contains(&key.as_str()) {
+                             if let Some(value) = repo.settings.get(key) {
+                                let val_str = serde_yaml::to_string(value).unwrap_or_default().trim().to_string();
+                                // Basic indentation and handling for simple values
+                                yaml_content.push_str(&format!("    {}: {}\n", key, val_str));
+                              }
+                           }
+                       }
+                 } else {
+                      // Still ensure settings key exists if empty
+                      yaml_content.push_str("  settings: {}\n");
+                 }
+
+
+                 if let Some(visibility) = &repo.visibility {
+                     yaml_content.push_str(&format!("  visibility: {}\n", visibility));
+                 }
+                 // Write webhook only if different from default (if default exists)
+                  if let Some(webhook) = &repo.webhook {
+                     if config.default_webhook.as_ref() != Some(webhook) {
                         yaml_content.push_str("  webhook:\n");
                         yaml_content.push_str(&format!("    url: {}\n", webhook.url));
                         yaml_content.push_str(&format!("    content_type: {}\n", webhook.content_type));
@@ -772,56 +797,180 @@ impl GitHubClient {
                         let mut events = webhook.events.clone();
                         events.sort();
                         for event in &events {
-                            yaml_content.push_str(&format!("    - {}\n", event));
-                        }
-                    }
+                         yaml_content.push_str(&format!("    - {}\n", event));
+                         }
+                     }
+                  } else if config.default_webhook.is_none() {
+                     // If no default, explicitly state no webhook? Or omit? Omit for cleaner.
+                     // yaml_content.push_str("  webhook: null\n");
+                  }
+                // Add branch protections if needed
+                if !repo.branch_protections.is_empty() {
+                    // Serialize properly
                 }
-            }
-            yaml_content.push_str("\n");
-        }
+             }
+             yaml_content.push_str("\n");
+         }
 
-        let mut teams = config.teams.clone();
-        teams.sort_by(|a, b| a.name.cmp(&b.name));
-        if !teams.is_empty() {
-            yaml_content.push_str("teams:\n");
-            for team in &teams {
-                yaml_content.push_str(&format!("- name: {}\n", team.name));
-                yaml_content.push_str("  members:\n");
-                let mut members = team.members.clone();
-                members.sort();
-                for member in &members {
-                    yaml_content.push_str(&format!("  - {}\n", member));
-                }
-            }
-            yaml_content.push_str("\n");
-        }
+         // Add teams (sorted)
+         let mut teams = config.teams;
+         teams.sort_by(|a, b| a.name.cmp(&b.name));
+         if !teams.is_empty() {
+             yaml_content.push_str("teams:\n");
+             for team in &teams {
+                 yaml_content.push_str(&format!("- name: {}\n", team.name));
+                 yaml_content.push_str("  members:\n");
+                 let mut members = team.members.clone();
+                 members.sort();
+                 for member in &members {
+                     yaml_content.push_str(&format!("  - {}\n", member));
+                 }
+             }
+             yaml_content.push_str("\n");
+         }
 
-        let mut users = config.users.clone();
-        users.sort_by(|a, b| a.login.cmp(&b.login));
-        if !users.is_empty() {
-            yaml_content.push_str("users:\n");
-            for user in &users {
-                yaml_content.push_str(&format!("- login: {}\n  role: {}\n", user.login, user.role));
-            }
-            yaml_content.push_str("\n");
-        }
+         // Add users (sorted)
+         let mut users = config.users;
+         users.sort_by(|a, b| a.login.cmp(&b.login));
+         if !users.is_empty() {
+             yaml_content.push_str("users:\n");
+             for user in &users {
+                 yaml_content.push_str(&format!("- login: {}\n  role: {}\n", user.login, user.role));
+             }
+             yaml_content.push_str("\n");
+         }
 
-        if dry_run {
-            println!("Dry run: Would write the following config to {}:\n{}", config_path, yaml_content);
-        } else {
-            println!("Writing generated config to {}", config_path);
-            let mut file = File::create(config_path)
-                .map_err(|e| AppError::Io(e))?;
-            file.write_all(yaml_content.as_bytes())
-                .map_err(|e| AppError::Io(e))?;
-            println!("Config generation completed successfully.");
-        }
+         if dry_run {
+             println!("Dry run: Would write the following config to {}:\n{}", config_path, yaml_content);
+         } else {
+             println!("Writing generated config to {}", config_path);
+             let mut file = File::create(config_path).map_err(AppError::Io)?;
+             file.write_all(yaml_content.as_bytes()).map_err(AppError::Io)?;
+             println!("Config generation completed successfully.");
+         }
         Ok(())
+    }
+
+    async fn generate_unfiltered_config_from_org(&self) -> AppResult<Config> {
+        // This is essentially the original logic of generate_config_from_org
+         let mut repos = Vec::new();
+        let repo_url = format!("https://api.github.com/orgs/{}/repos?per_page=100", self.org);
+        let repo_response = self.get(&repo_url).await?;
+        let repo_json: Vec<serde_json::Value> = repo_response.json().await.map_err(AppError::Http)?;
+
+        for repo in repo_json {
+            let name = repo["name"].as_str().ok_or_else(|| AppError::GitHubApi("Missing repo name".to_string()))?.to_string();
+            // Fetch *limited* settings relevant for generating a *manageable* config
+            let settings = match self.get_repo_settings(&name).await {
+                Ok(full_settings) => {
+                    let mut manageable_settings = RepoSettings::new();
+                    // Only include settings we typically manage
+                    let managed_keys = ["allow_merge_commit", "allow_squash_merge", "allow_rebase_merge"];
+                    for key in managed_keys {
+                         if let Some(value) = full_settings.get(key) {
+                             manageable_settings.insert(key.to_string(), value.clone());
+                         }
+                    }
+                     manageable_settings
+                }
+                Err(e) => {
+                   error!("Failed to fetch settings for repo {}: {}", name, e);
+                    RepoSettings::new() // Return empty settings on error
+                }
+            };
+
+            let visibility = if repo["private"].as_bool().unwrap_or(false) { Some("private".to_string()) } else { Some("public".to_string()) };
+            let webhooks = self.get_webhooks(&name).await.unwrap_or_default(); // Handle potential error
+            let webhook = webhooks.first().map(|wh| WebhookConfig {
+                url: wh.config.url.clone(),
+                content_type: wh.config.content_type.clone(),
+                events: wh.events.clone(),
+            });
+
+            repos.push(Repo {
+                name,
+                settings,
+                visibility,
+                webhook,
+                branch_protections: vec![], // Add logic to fetch these if needed
+                extra: std::collections::HashMap::new(),
+            });
+        }
+
+        // Fetch teams, users, assignments as before (full state needed for generation)
+        let mut teams = Vec::new();
+        let team_url = format!("https://api.github.com/orgs/{}/teams?per_page=100", self.org);
+        let team_response = self.get(&team_url).await?;
+        let team_json: Vec<serde_json::Value> = team_response.json().await.map_err(AppError::Http)?;
+
+        for team in team_json {
+            // Fetch full team data including members
+             let name = team["slug"].as_str().ok_or_else(|| AppError::GitHubApi("Missing team slug".to_string()))?.to_string();
+            let members_url = format!("https://api.github.com/orgs/{}/teams/{}/members?per_page=100", self.org, name);
+            let members_response = self.get(&members_url).await?;
+            let members_json: Vec<serde_json::Value> = members_response.json().await.map_err(AppError::Http)?;
+            let mut members = members_json.iter()
+                .filter_map(|m| m["login"].as_str().map(String::from))
+                .collect::<Vec<String>>();
+            members.sort();
+
+            teams.push(Team { name, members });
+        }
+
+        let mut users = Vec::new();
+        let members_url = format!("https://api.github.com/orgs/{}/members?per_page=100", self.org);
+        let members_response = self.get(&members_url).await?;
+        let members_json: Vec<serde_json::Value> = members_response.json().await.map_err(AppError::Http)?;
+
+        for member in members_json {
+            let login = member["login"].as_str().ok_or_else(|| AppError::GitHubApi("Missing member login".to_string()))?.to_string();
+            let role_response = self.get_user_membership(&login).await?;
+            let role = role_response.unwrap_or("member".to_string()); // Default to member if fetch fails? Or error?
+            users.push(User { login, role });
+        }
+
+        let mut assignments = Vec::new();
+        for team in &teams {
+            let team_repos = self.get_team_repos(&team.name).await?;
+            for repo in team_repos {
+                 let permission = if repo.permissions.admin {
+                    "admin"
+                } else if repo.permissions.push {
+                    "push" // Use push/pull
+                } else if repo.permissions.pull {
+                    "pull"
+                } else {
+                    "none"
+                };
+                if permission != "none" {
+                    assignments.push(Assignment {
+                        repo: repo.name.clone(),
+                        team: team.name.clone(),
+                        permission: permission.to_string(),
+                    });
+                }
+            }
+        }
+
+         // Determine default webhook - find the most common one perhaps?
+         // Or just pick the first one found for simplicity? Let's pick first.
+        let default_webhook = repos.iter().find_map(|r| r.webhook.clone());
+
+        Ok(Config {
+            org: self.org.clone(),
+            repos,
+            teams,
+            users,
+            assignments,
+            default_webhook,
+            default_branch_protections: vec![], // Add logic if needed
+            extra: std::collections::HashMap::new(),
+        })
     }
 
     pub async fn sync(&mut self, config_path: &str, dry_run: bool) -> AppResult<()> {
         let config = crate::config::Config::from_file_with_defaults(config_path, None)?;
-        self.org = config.org.clone();
+        self.org = config.org.clone(); // Set org from config
 
         if dry_run {
             info!("Running in dry-run mode; validating changes without applying.");
@@ -830,6 +979,7 @@ impl GitHubClient {
         }
 
         let mut config = config;
+        // Apply default webhook *before* iterating repos for sync
         if let Some(default_webhook) = &config.default_webhook {
             for repo in &mut config.repos {
                 if repo.webhook.is_none() {
@@ -837,31 +987,36 @@ impl GitHubClient {
                 }
             }
         } else {
-            return Err(AppError::GitHubApi(
-                "No default_webhook specified in config, and not all repos have webhooks".to_string(),
-            ));
+             // If no default webhook, ensure all repos have one explicitly defined
+             if config.repos.iter().any(|r| r.webhook.is_none()) {
+                  return Err(AppError::GitHubApi(
+                     "Sync requires either a 'default_webhook' or explicit 'webhook' definition for every repo in the config.".to_string()
+                 ));
+             }
         }
 
+        // Sync resources
         for repo in &config.repos {
-            if repo.webhook.is_none() {
-                return Err(AppError::GitHubApi(format!(
-                    "Repository {} has no webhook configuration",
-                    repo.name
-                )));
-            }
-            self.update_repo_settings(repo, dry_run).await?;
+            // We already checked/applied default webhook, so repo.webhook should be Some if needed
+             self.update_repo_settings(repo, dry_run).await?;
         }
 
         for team in &config.teams {
             self.create_team(team, dry_run).await?;
         }
 
+        // Add logic to fetch existing org members and sync roles (handle additions/removals/role changes)
+        // This needs more careful handling than just adding users.
+        // For now, keep the simplistic add/update:
         for user in &config.users {
-            self.add_user_to_org(user, dry_run).await?;
+             self.add_user_to_org(user, dry_run).await?;
         }
 
+
+        // Add logic to fetch existing assignments and sync permissions (handle additions/removals/permission changes)
+        // For now, keep the simplistic add/update:
         for assignment in &config.assignments {
-            self.assign_team_to_repo(assignment, dry_run).await?;
+             self.assign_team_to_repo(assignment, dry_run).await?;
         }
 
         if dry_run {
@@ -872,82 +1027,387 @@ impl GitHubClient {
         Ok(())
     }
 
-    pub async fn diff(&self, config_path: &str) -> AppResult<bool> {
-        info!("Generating diff between GitHub state and local config: {}", config_path);
+    /// Generates a Config object representing the current GitHub state,
+    /// but ONLY includes resources and fields explicitly mentioned in the provided local_config.
+    /// This is used specifically for the `diff` command.
+    async fn generate_filtered_config_from_org(&self, local_config: &Config) -> AppResult<Config> {
+        info!("Fetching relevant GitHub state based on local config structure for diffing.");
 
-        // Fetch GitHub's current state
-        let mut github_config = self.generate_config_from_org().await?;
+        let mut filtered_github_config = Config {
+            org: self.org.clone(),
+            repos: Vec::new(),
+            teams: Vec::new(),
+            users: Vec::new(),
+            assignments: Vec::new(),
+            // We don't compare default_webhook or default_branch_protections directly in diff,
+            // they are applied to individual repos before comparison.
+            default_webhook: None, // Not needed for filtered diff comparison
+            default_branch_protections: Vec::new(), // Not needed for filtered diff comparison
+            extra: HashMap::new(), // Ignore extra fields for diff
+        };
 
-        // Load and consolidate local config (apply default_webhook to repos)
-        let mut local_config = crate::config::Config::from_file_with_defaults(config_path, None)?;
-        if let Some(default_webhook) = &local_config.default_webhook {
-            for repo in &mut local_config.repos {
-                if repo.webhook.is_none() {
-                    repo.webhook = Some(default_webhook.clone());
+        // --- Filter Repos ---
+        // Get the names of repos defined locally
+        let local_repo_names: HashSet<&str> = local_config.repos.iter().map(|r| r.name.as_str()).collect();
+
+        // Fetch settings only for locally defined repos
+        let mut github_repo_settings_map = HashMap::new();
+        let mut unprocessed_repos = Vec::new(); // Store full repo data temporarily
+
+        let repo_url = format!("https://api.github.com/orgs/{}/repos?per_page=100", self.org);
+        let repo_response = self.get(&repo_url).await?;
+        let repo_json: Vec<serde_json::Value> = repo_response.json().await.map_err(AppError::Http)?;
+
+        for repo_data in repo_json {
+             if let Some(name) = repo_data["name"].as_str() {
+                if local_repo_names.contains(name) {
+                    // Fetch detailed settings ONLY if the repo is in the local config
+                    match self.get_repo_settings(name).await {
+                       Ok(settings) => {
+                           github_repo_settings_map.insert(name.to_string(), settings);
+                           unprocessed_repos.push(repo_data.clone()); // Store for visibility/webhook check
+                       },
+                       Err(e) => {
+                           error!("Failed to get settings for repo {}: {}. Skipping for diff.", name, e);
+                           // Optionally decide how to handle repos that exist locally but fail to fetch from GitHub
+                       }
+                    }
                 }
             }
         }
 
-        // Sort repos alphabetically by name in both configs
-        github_config.repos.sort_by(|a, b| a.name.cmp(&b.name));
-        local_config.repos.sort_by(|a, b| a.name.cmp(&b.name));
 
-        // Serialize both configs to YAML strings
-        let github_yaml = serde_yaml::to_string(&github_config)?;
-        let local_yaml = serde_yaml::to_string(&local_config)?;
+        for local_repo in &local_config.repos {
+            let repo_name = &local_repo.name;
 
-        // Compute the unified diff with line numbers and context
-        let diff = TextDiff::from_lines(&github_yaml, &local_yaml);
-        let mut unified_diff = diff.unified_diff();
-        let unified_diff = unified_diff.context_radius(3).header("GitHub", "Local");
+            // Find the basic repo data fetched earlier
+            let github_basic_data = unprocessed_repos.iter().find(|r| r["name"].as_str() == Some(repo_name));
+             // Find the detailed settings fetched earlier
+            let full_github_settings = github_repo_settings_map.get(repo_name);
 
-        // Check if there are any differences and output them
-        let has_diffs = unified_diff.iter_hunks().next().is_some();
-        if !has_diffs {
-            println!("No differences found between GitHub state and local config.");
-        } else {
-            println!("Differences between GitHub state and local config (with line numbers):");
-            println!("--- GitHub");
-            println!("+++ Local");
-            for (idx, hunk) in unified_diff.iter_hunks().enumerate() {
-                // Calculate old and new line ranges from changes
-                let mut old_start = None;
-                let mut old_count = 0;
-                let mut new_start = None;
-                let mut new_count = 0;
-
-                for change in hunk.iter_changes() {
-                    if let Some(old_line) = change.old_index() {
-                        if old_start.is_none() {
-                            old_start = Some(old_line + 1); // 1-based indexing
-                        }
-                        old_count += 1;
-                    }
-                    if let Some(new_line) = change.new_index() {
-                        if new_start.is_none() {
-                            new_start = Some(new_line + 1); // 1-based indexing
-                        }
-                        new_count += 1;
+            if let (Some(basic_data) , Some(github_settings) ) = (github_basic_data, full_github_settings) {
+                let mut filtered_settings = RepoSettings::new();
+                // Only include settings that are present in the local config's settings map
+                for key in local_repo.settings.keys() {
+                    if let Some(value) = github_settings.get(key) {
+                        filtered_settings.insert(key.clone(), value.clone());
+                    } else {
+                         // Key is in local config but not returned by API (might be an error or just not set)
+                         // Insert a Null value to explicitly show it's missing in the diff compared to local definition.
+                         filtered_settings.insert(key.clone(), Value::Null);
                     }
                 }
 
-                let old_start = old_start.unwrap_or(1); // Default to 1 if no old lines
-                let new_start = new_start.unwrap_or(1); // Default to 1 if no new lines
-                let old_count = if old_count == 0 { 1 } else { old_count }; // Ensure at least 1 line
-                let new_count = if new_count == 0 { 1 } else { new_count }; // Ensure at least 1 line
+                 // Handle visibility if defined locally
+                let github_visibility = if local_repo.visibility.is_some() {
+                     Some(if basic_data["private"].as_bool().unwrap_or(false) { "private" } else { "public" }.to_string())
+                 } else {
+                     None // Don't include visibility if not in local config
+                 };
 
-                println!(
-                    "@@ -{},{} +{},{} @@ Hunk {}",
-                    old_start, old_count, new_start, new_count, idx + 1
-                );
-                for change in hunk.iter_changes() {
-                    match change.tag() {
-                        ChangeTag::Delete => println!("{}", format!("- {}", change.value().trim_end()).red()),
-                        ChangeTag::Insert => println!("{}", format!("+ {}", change.value().trim_end()).green()),
-                        ChangeTag::Equal => println!("  {}", change.value().trim_end()),
+                 // Handle webhook if defined locally (either directly or via default)
+                 let github_webhook = if local_repo.webhook.is_some() || local_config.default_webhook.is_some() { // Check if local *config* effectively has a webhook
+                    match self.get_webhooks(repo_name).await {
+                        Ok(hooks) => {
+                            // Determine the target URL: Use explicit if defined, else default if available
+                            let target_url = match &local_repo.webhook {
+                                Some(wh) => &wh.url,
+                                None => match &local_config.default_webhook { // Check the original local_config
+                                    Some(def_wh) => &def_wh.url,
+                                    None => { // Should not happen if the outer 'if' is correct, but safeguard
+                                        error!("Inconsistency: Webhook check requested for repo {} but no effective webhook URL found.", repo_name);
+                                        continue; // Skip webhook processing
+                                    }
+                                }
+                            };
+
+                            // Find the hook matching the target URL from GitHub API response
+                            hooks.iter().find(|h| h.config.url == *target_url).map(|wh| {
+                                // Create WebhookConfig from the found GitHub hook
+                                let mut events = wh.events.clone();
+                                events.sort(); // <-- SORT EVENTS HERE
+                                WebhookConfig {
+                                    url: wh.config.url.clone(),
+                                    content_type: wh.config.content_type.clone(),
+                                    events, // Use sorted events
+                                }
+                            })
+                        },
+                        Err(e) => {
+                           error!("Failed to get webhooks for repo {}: {}. Skipping webhook diff.", repo_name, e);
+                           None
+                        },
+                    }
+                } else {
+                    None // Don't include webhook if not effectively defined locally
+                };
+
+
+                filtered_github_config.repos.push(Repo {
+                    name: repo_name.clone(),
+                    settings: filtered_settings,
+                    visibility: github_visibility,
+                    webhook: github_webhook, // Add the potentially filtered webhook
+                    // Keep branch protections and extra empty as they aren't diffed this way (yet)
+                    branch_protections: vec![],
+                    extra: HashMap::new(),
+                });
+            } else {
+                 // Repo defined locally but not found on GitHub (or settings fetch failed)
+                 // Add a placeholder or log an error. For diff, maybe omit it or add a special marker.
+                 // For now, we'll just omit it, the diff will show the local one as an addition (+)
+                 info!("Repo '{}' defined locally but not found or settings fetch failed on GitHub. Will show as addition in diff.", repo_name);
+            }
+        }
+
+        // --- Filter Teams ---
+        let local_team_names: HashSet<&str> = local_config.teams.iter().map(|t| t.name.as_str()).collect();
+        let team_url = format!("https://api.github.com/orgs/{}/teams?per_page=100", self.org);
+        match self.get(&team_url).await {
+            Ok(team_response) => {
+                let team_json: Vec<serde_json::Value> = team_response.json().await.map_err(AppError::Http)?;
+                for github_team_data in team_json {
+                    if let Some(name) = github_team_data["slug"].as_str() { // Use slug for member fetching
+                        if local_team_names.contains(name) { // Check against local name
+                            let members_url = format!("https://api.github.com/orgs/{}/teams/{}/members?per_page=100", self.org, name);
+                            match self.get(&members_url).await {
+                                Ok(members_response) => {
+                                     let members_json: Vec<serde_json::Value> = members_response.json().await.map_err(AppError::Http)?;
+                                     let mut members: Vec<String> = members_json.iter()
+                                        .filter_map(|m| m["login"].as_str().map(String::from))
+                                        .collect();
+                                     members.sort(); // Sort for consistent diff
+                                     filtered_github_config.teams.push(Team { name: name.to_string(), members });
+                                },
+                                Err(e) => error!("Failed to get members for team {}: {}. Skipping team for diff.", name, e),
+                            }
+                        }
+                    }
+                 }
+            }
+            Err(e) => error!("Failed to fetch teams from GitHub: {}. Skipping teams diff.", e),
+        }
+
+
+         // --- Filter Users ---
+         let local_user_logins: HashSet<&str> = local_config.users.iter().map(|u| u.login.as_str()).collect();
+         let members_url = format!("https://api.github.com/orgs/{}/members?per_page=100", self.org);
+         match self.get(&members_url).await {
+            Ok(members_response) => {
+                let members_json: Vec<serde_json::Value> = members_response.json().await.map_err(AppError::Http)?;
+                 for member_data in members_json {
+                     if let Some(login) = member_data["login"].as_str() {
+                         if local_user_logins.contains(login) {
+                             match self.get_user_membership(login).await {
+                                 Ok(Some(role)) => {
+                                     filtered_github_config.users.push(User { login: login.to_string(), role });
+                                 },
+                                 Ok(None) => error!("User {} known locally but membership fetch returned None. Skipping user for diff.", login), // Should not happen for members
+                                 Err(e) => error!("Failed to get membership for user {}: {}. Skipping user for diff.", login, e),
+                            }
+                        }
                     }
                 }
             }
+            Err(e) => error!("Failed to fetch members from GitHub: {}. Skipping users diff.", e),
+         }
+
+        // --- Filter Assignments ---
+        // Create lookups for faster checks
+        let local_assignments_set: HashSet<(&str, &str)> = local_config.assignments.iter().map(|a| (a.team.as_str(), a.repo.as_str())).collect();
+        let local_teams_map: HashMap<&str, &Team> = local_config.teams.iter().map(|t| (t.name.as_str(), t)).collect();
+
+        for local_team_name in local_teams_map.keys() {
+              // Check if team exists on GitHub side (fetched earlier)
+              if filtered_github_config.teams.iter().any(|t| t.name == *local_team_name) {
+                    match self.get_team_repos(local_team_name).await {
+                        Ok(github_team_repos) => {
+                            for github_repo_perm in github_team_repos {
+                                // Only include assignments if the (team, repo) pair is in local config
+                                if local_assignments_set.contains(&(local_team_name, github_repo_perm.name.as_str())) {
+                                    let permission = if github_repo_perm.permissions.admin {
+                                        "admin"
+                                    } else if github_repo_perm.permissions.push {
+                                        "push" // Changed from "write" to "push" to match config example
+                                    } else if github_repo_perm.permissions.pull {
+                                        "pull" // changed from "read" to "pull"
+                                    } else {
+                                        "none"
+                                    };
+                                    if permission != "none" {
+                                        filtered_github_config.assignments.push(Assignment {
+                                             repo: github_repo_perm.name.clone(),
+                                             team: local_team_name.to_string(),
+                                             permission: permission.to_string(),
+                                         });
+                                    }
+                                 }
+                             }
+                         },
+                        Err(e) => error!("Failed to get repos for team {}: {}. Skipping assignments for this team.", local_team_name, e),
+                     }
+                }
+         }
+
+
+        Ok(filtered_github_config)
+    }
+
+    /// Diffs the local configuration against the filtered GitHub state.
+    pub async fn diff(&self, config_path: &str) -> AppResult<bool> {
+        info!("Generating diff between relevant GitHub state and local config: {}", config_path);
+
+        // --- Step 1: Load original local config & track explicit webhooks ---
+        let local_config = crate::config::Config::from_file_with_defaults(config_path, None)?;
+        let local_default_webhook = local_config.default_webhook.clone();
+        // Keep track of original explicit webhooks
+        let originally_explicit_webhooks: HashSet<String> = local_config.repos.iter()
+            .filter(|r| r.webhook.is_some())
+            .map(|r| r.name.clone())
+            .collect();
+
+        // --- Step 2: Fetch GitHub state filtered by local config structure ---
+        let github_config = self.generate_filtered_config_from_org(&local_config).await?;
+
+        // --- Step 3: Prepare final versions for diffing ---
+        let mut diff_local_config = local_config.clone(); // Clone original local config
+        let mut diff_github_config = github_config;      // Use the fetched GitHub state
+
+        // --- Step 4: Apply local default webhook logic to the local config *copy* ---
+        let mut sorted_local_default_webhook = local_default_webhook.clone(); // Clone to sort optional default
+        if let Some(ref mut wh) = sorted_local_default_webhook {
+            wh.events.sort(); // Sort events in the default webhook we'll use for comparison
+        }
+
+        if let Some(ref default_webhook) = local_default_webhook { // Use original for application logic
+            for repo in &mut diff_local_config.repos {
+                if repo.webhook.is_none() {
+                    repo.webhook = Some(default_webhook.clone());
+                }
+                // Sort events for consistent comparison (both applied default and explicit)
+                if let Some(wh) = repo.webhook.as_mut() {
+                    wh.events.sort();
+                }
+            }
+        }
+        // Events in diff_github_config were sorted during generate_filtered_config_from_org
+
+        // --- Step 5: Normalization - Remove matching default webhooks ---
+        if let Some(ref default_wh) = sorted_local_default_webhook { // Use the sorted version for comparison
+            for local_repo in &mut diff_local_config.repos {
+                // Check if this repo originally relied on the default
+                if !originally_explicit_webhooks.contains(&local_repo.name) {
+                    // Find the corresponding repo in the GitHub fetched state
+                    if let Some(gh_repo) = diff_github_config.repos.iter_mut().find(|r| r.name == local_repo.name) {
+
+                        // --- ADD MORE DEBUGGING ---
+                        debug!("Checking webhook normalization for repo: {}", local_repo.name);
+                        let gh_wh_ref = gh_repo.webhook.as_ref();
+                        let default_wh_ref_option = Some(default_wh); // Create Option<&WebhookConfig>
+                        debug!("  Comparing GitHub Webhook: {:?}", gh_wh_ref);
+                        debug!("        Against Default Webhook: {:?}", default_wh_ref_option);
+                        // --- END DEBUGGING ---
+
+                        // Compare gh_repo's webhook (Option<&WebhookConfig>) against Some(&default_wh)
+                        // Remove the extra .as_ref() from the right side
+                        if gh_wh_ref == default_wh_ref_option { // Correct comparison
+                            debug!("  MATCH FOUND! Normalizing webhook for repo '{}'.", local_repo.name);
+                            local_repo.webhook = None; // Remove from local diff version
+                            gh_repo.webhook = None;    // Remove from github diff version
+                        } else {
+                             // Explanation for no match
+                             if gh_wh_ref.is_none() && default_wh_ref_option.is_some() {
+                                  debug!("  NO MATCH: GitHub webhook is None, but default exists.");
+                             } else if gh_wh_ref.is_some() && default_wh_ref_option.is_none() {
+                                  // This case shouldn't happen if outer 'if let Some' is working
+                                  debug!("  NO MATCH: GitHub webhook exists, but no default to compare against (unexpected).");
+                             } else if gh_wh_ref.is_some() && default_wh_ref_option.is_some() {
+                                   debug!("  NO MATCH: Both GitHub and default webhooks exist but differ.");
+                                   // Optionally log the differing fields here if needed
+                             } else { // both None
+                                  debug!("  NO MATCH needed: Both GitHub and default webhooks are effectively None.");
+                             }
+                         }
+                    }
+                } else {
+                    debug!("Skipping webhook normalization for repo '{}' (had explicit webhook).", local_repo.name);
+                }
+            }
+        } else {
+                debug!("No default webhook defined locally. Skipping webhook normalization.");
+        }
+
+        // --- Step 6: Remove top-level default key before serialization ---
+        diff_local_config.default_webhook = None;
+
+        // --- Step 7: Sort both configs... (ensure BTreeMap logic is kept) ---
+        // Repos
+        diff_local_config.repos.sort_by(|a, b| a.name.cmp(&b.name));
+        diff_github_config.repos.sort_by(|a, b| a.name.cmp(&b.name));
+        // Sort settings within each repo for consistency
+        for repo in &mut diff_local_config.repos {
+                let sorted_settings: std::collections::BTreeMap<_,_> = repo.settings.clone().into_iter().collect();
+                repo.settings = sorted_settings.into_iter().collect();
+        }
+        for repo in &mut diff_github_config.repos {
+                let sorted_settings: std::collections::BTreeMap<_,_> = repo.settings.clone().into_iter().collect();
+                repo.settings = sorted_settings.into_iter().collect();
+        }
+
+
+        // Teams (and members within teams)
+        diff_local_config.teams.sort_by(|a, b| a.name.cmp(&b.name));
+        diff_github_config.teams.sort_by(|a, b| a.name.cmp(&b.name));
+        for team in &mut diff_local_config.teams { team.members.sort(); }
+        for team in &mut diff_github_config.teams { team.members.sort(); }
+
+        // Users
+        diff_local_config.users.sort_by(|a, b| a.login.cmp(&b.login));
+        diff_github_config.users.sort_by(|a, b| a.login.cmp(&b.login));
+
+        // Assignments
+        diff_local_config.assignments.sort_by(|a, b| a.team.cmp(&b.team).then(a.repo.cmp(&b.repo)));
+        diff_github_config.assignments.sort_by(|a, b| a.team.cmp(&b.team).then(a.repo.cmp(&b.repo)));
+
+        // --- Step 8: Serialize and Diff ---
+        let github_yaml = serde_yaml::to_string(&diff_github_config)?;
+        let local_yaml = serde_yaml::to_string(&diff_local_config)?;
+
+        // Compute and print diff
+        let diff = TextDiff::from_lines(&github_yaml, &local_yaml);
+
+        // Corrected: Bind the configured builder to ensure it lives long enough
+        let mut unifiedDiff = diff.unified_diff();
+        let unified_diff_builder = unifiedDiff // Create the builder
+            .context_radius(3)                           // Configure it
+            .header("GitHub (Normalized)", "Local Config (Normalized)"); // Configure it further
+
+        let mut has_diffs = false;
+        let mut output_buffer = String::new();
+
+        // Iterate using the named builder instance
+        for hunk in unified_diff_builder.iter_hunks() { // Now using the variable that lives long enough
+            has_diffs = true;
+            output_buffer.push_str(&format!(
+                "@@ {} @@\n",
+                hunk.header()
+            ));
+            for change in hunk.iter_changes() {
+                match change.tag() {
+                    ChangeTag::Delete => output_buffer.push_str(&format!("{}\n", format!("- {}", change.value().trim_end()).red())),
+                    ChangeTag::Insert => output_buffer.push_str(&format!("{}\n", format!("+ {}", change.value().trim_end()).green())),
+                    ChangeTag::Equal => output_buffer.push_str(&format!("  {}\n", change.value().trim_end())),
+                }
+            }
+        }
+
+        if !has_diffs {
+            println!("No differences found between relevant GitHub state and local config.");
+        } else {
+            println!("Differences found between relevant GitHub state and local config:");
+            println!("--- GitHub (Normalized)"); // Adjusted header
+            println!("+++ Local Config (Normalized)"); // Adjusted header
+            print!("{}", output_buffer);
         }
         Ok(has_diffs)
     }

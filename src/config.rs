@@ -125,7 +125,7 @@ pub struct Assignment {
     pub permission: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 ///
 /// Top-level configuration for gh-config-cli.
 ///
