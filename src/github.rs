@@ -1378,9 +1378,9 @@ impl GitHubClient {
         Ok(filtered_github_config)
     }
 
-    /// Diffs the local configuration against the filtered GitHub state.
+    /// Diffs the local configuration against the full GitHub org state (as written by sync-from-github).
     pub async fn diff(&self, config_path: &str) -> AppResult<bool> {
-        info!("Generating diff between relevant GitHub state and local config: {}", config_path);
+        info!("Generating diff between full GitHub org state and local config: {} (this matches what sync-from-github would write)", config_path);
 
         // --- Step 1: Load original local config & track explicit webhooks ---
         let local_config = crate::config::Config::from_file_with_defaults(config_path, None)?;
@@ -1391,12 +1391,12 @@ impl GitHubClient {
             .map(|r| r.name.clone())
             .collect();
 
-        // --- Step 2: Fetch GitHub state filtered by local config structure ---
-        let github_config = self.generate_filtered_config_from_org(&local_config).await?;
+        // --- Step 2: Fetch FULL GitHub org state (unfiltered, as sync-from-github would write) ---
+        let github_config = self.generate_unfiltered_config_from_org().await?;
 
         // --- Step 3: Prepare final versions for diffing ---
         let mut diff_local_config = local_config.clone(); // Clone original local config
-        let mut diff_github_config = github_config;      // Use the fetched GitHub state
+        let mut diff_github_config = github_config;      // Use the fetched FULL GitHub org state
 
         // --- Step 4: Apply local default webhook logic to the local config *copy* ---
         let mut sorted_local_default_webhook = local_default_webhook.clone(); // Clone to sort optional default
@@ -1417,53 +1417,42 @@ impl GitHubClient {
         }
         // Events in diff_github_config were sorted during generate_filtered_config_from_org
 
-        // --- Step 5: Normalization - Remove matching default webhooks ---
-        if let Some(ref default_wh) = sorted_local_default_webhook { // Use the sorted version for comparison
-            for local_repo in &mut diff_local_config.repos {
-                // Check if this repo originally relied on the default
-                if !originally_explicit_webhooks.contains(&local_repo.name) {
-                    // Find the corresponding repo in the GitHub fetched state
-                    if let Some(gh_repo) = diff_github_config.repos.iter_mut().find(|r| r.name == local_repo.name) {
+        // --- Step 5: Normalization - Remove matching default webhooks for both configs ---
+        // Helper closure to normalize webhooks and default_webhook
+        let normalize_webhooks = |config: &mut crate::config::Config| {
+            // Sort default webhook events for comparison
+            let mut sorted_default = config.default_webhook.clone();
+            if let Some(ref mut wh) = sorted_default { wh.events.sort(); }
 
-                        // --- ADD MORE DEBUGGING ---
-                        debug!("Checking webhook normalization for repo: {}", local_repo.name);
-                        let gh_wh_ref = gh_repo.webhook.as_ref();
-                        let default_wh_ref_option = Some(default_wh); // Create Option<&WebhookConfig>
-                        debug!("  Comparing GitHub Webhook: {:?}", gh_wh_ref);
-                        debug!("        Against Default Webhook: {:?}", default_wh_ref_option);
-                        // --- END DEBUGGING ---
-
-                        // Compare gh_repo's webhook (Option<&WebhookConfig>) against Some(&default_wh)
-                        // Remove the extra .as_ref() from the right side
-                        if gh_wh_ref == default_wh_ref_option { // Correct comparison
-                            debug!("  MATCH FOUND! Normalizing webhook for repo '{}'.", local_repo.name);
-                            local_repo.webhook = None; // Remove from local diff version
-                            gh_repo.webhook = None;    // Remove from github diff version
-                        } else {
-                             // Explanation for no match
-                             if gh_wh_ref.is_none() && default_wh_ref_option.is_some() {
-                                  debug!("  NO MATCH: GitHub webhook is None, but default exists.");
-                             } else if gh_wh_ref.is_some() && default_wh_ref_option.is_none() {
-                                  // This case shouldn't happen if outer 'if let Some' is working
-                                  debug!("  NO MATCH: GitHub webhook exists, but no default to compare against (unexpected).");
-                             } else if gh_wh_ref.is_some() && default_wh_ref_option.is_some() {
-                                   debug!("  NO MATCH: Both GitHub and default webhooks exist but differ.");
-                                   // Optionally log the differing fields here if needed
-                             } else { // both None
-                                  debug!("  NO MATCH needed: Both GitHub and default webhooks are effectively None.");
-                             }
-                         }
+            // Track repos that actually use the default
+            let mut used_default = false;
+            for repo in &mut config.repos {
+                // Sort events for explicit webhooks
+                if let Some(ref mut wh) = repo.webhook { wh.events.sort(); }
+                // If repo webhook matches default, set to None for diffing
+                if let (Some(ref wh), Some(ref def)) = (&repo.webhook, &sorted_default) {
+                    if wh == def {
+                        repo.webhook = None;
+                        used_default = true;
                     }
-                } else {
-                    debug!("Skipping webhook normalization for repo '{}' (had explicit webhook).", local_repo.name);
+                } else if repo.webhook.is_none() && sorted_default.is_some() {
+                    // If repo has no webhook, it implicitly uses the default
+                    used_default = true;
                 }
             }
-        } else {
-                debug!("No default webhook defined locally. Skipping webhook normalization.");
-        }
+            // If no repo uses the default, set it to None for diffing
+            if !used_default {
+                config.default_webhook = None;
+            } else {
+                // Always store sorted version for diffing
+                config.default_webhook = sorted_default;
+            }
+        };
+        normalize_webhooks(&mut diff_local_config);
+        normalize_webhooks(&mut diff_github_config);
 
-        // --- Step 6: Remove top-level default key before serialization ---
-        diff_local_config.default_webhook = None;
+        // --- Step 6: Remove top-level default key if not used by any repo ---
+        // (Handled above in normalization)
 
         // --- Step 7: Sort both configs... (ensure BTreeMap logic is kept) ---
         // Repos
@@ -1517,10 +1506,10 @@ impl GitHubClient {
         }
 
         if !has_diffs {
-            println!("No differences found between relevant GitHub state and local config.");
+            println!("No differences found between full GitHub org state and local config.");
         } else {
-            println!("Differences found between relevant GitHub state and local config:");
-            println!("--- GitHub (Normalized)"); // Adjusted header
+            println!("Differences found between full GitHub org state and local config:");
+            println!("--- GitHub Org (Normalized)"); // Adjusted header
             println!("+++ Local Config (Normalized)"); // Adjusted header
             print!("{}", output_buffer);
         }
