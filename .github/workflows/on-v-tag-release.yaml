@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   release:
-    uses: harmony-labs/workflow-rust-release/.github/workflows/workflow.yaml@main
+    uses: harmony-labs/workflow-rust-release/.github/workflows/workflow.yaml@v2.0.0
     with:
       binary_name: gh-config
       crate_name: gh-config-cli
