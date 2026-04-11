@@ -1,8 +1,8 @@
 # gh-config-cli
 
-[![CI](https://github.com/harmony-labs/gh-config-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/harmony-labs/gh-config-cli/actions/workflows/ci.yml)
+[![CI](https://github.com/gitkb/gh-config-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/gitkb/gh-config-cli/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Releases](https://img.shields.io/github/v/release/harmony-labs/gh-config-cli)](https://github.com/harmony-labs/gh-config-cli/releases)
+[![Releases](https://img.shields.io/github/v/release/gitkb/gh-config-cli)](https://github.com/gitkb/gh-config-cli/releases)
 
 A fast, declarative CLI tool to manage GitHub organization configuration as code, written in Rust.
 
@@ -65,19 +65,19 @@ Managing GitHub orgs manually or with scattered scripts is error-prone. `gh-conf
 ```bash
 mkdir -p "$HOME/bin"
 curl --silent --location https://raw.githubusercontent.com/houseabsolute/ubi/master/bootstrap/bootstrap-ubi.sh | sh
-"$HOME/bin/ubi" --project harmony-labs/gh-config-cli --exe gh-config --in "$HOME/bin"
+"$HOME/bin/ubi" --project gitkb/gh-config-cli --exe gh-config --in "$HOME/bin"
 ```
 
 ### From GitHub Releases
 
-Download the latest binary for your platform from [Releases](https://github.com/harmony-labs/gh-config-cli/releases), make it executable, and put it in your PATH.
+Download the latest binary for your platform from [Releases](https://github.com/gitkb/gh-config-cli/releases), make it executable, and put it in your PATH.
 
 ### From Source
 
 Requires Rust stable:
 
 ```bash
-git clone https://github.com/harmony-labs/gh-config-cli.git
+git clone https://github.com/gitkb/gh-config-cli.git
 cd gh-config-cli
 cargo build --release
 ./target/release/gh-config --help
@@ -216,7 +216,7 @@ jobs:
           curl --silent --location https://raw.githubusercontent.com/houseabsolute/ubi/master/bootstrap/bootstrap-ubi.sh | sh
       - name: Install gh-config
         run: |
-          "$HOME/bin/ubi" --project harmony-labs/gh-config-cli --exe gh-config --in "$HOME/bin"
+          "$HOME/bin/ubi" --project gitkb/gh-config-cli --exe gh-config --in "$HOME/bin"
       - name: Validate config
         env:
           GITHUB_TOKEN: ${{ secrets.GH_PAT }}
@@ -235,7 +235,7 @@ jobs:
           curl --silent --location https://raw.githubusercontent.com/houseabsolute/ubi/master/bootstrap/bootstrap-ubi.sh | sh
       - name: Install gh-config
         run: |
-          "$HOME/bin/ubi" --project harmony-labs/gh-config-cli --exe gh-config --in "$HOME/bin"
+          "$HOME/bin/ubi" --project gitkb/gh-config-cli --exe gh-config --in "$HOME/bin"
       - name: Apply config
         env:
           GITHUB_TOKEN: ${{ secrets.GH_PAT }}
@@ -303,4 +303,4 @@ More detailed guides and examples can be found in the `docs/` directory.
 ## Getting Help
 
 - See the [FAQ](docs/faq.md) for common questions.
-- Open an issue on [GitHub](https://github.com/harmony-labs/gh-config-cli/issues).
+- Open an issue on [GitHub](https://github.com/gitkb/gh-config-cli/issues).

@@ -43,7 +43,7 @@ See [docs/usage.md](usage.md) and [docs/architecture.md](architecture.md) for sc
 
 ## How do I report a bug or request a feature?
 
-Open an issue on [GitHub](https://github.com/harmony-labs/gh-config-cli/issues).
+Open an issue on [GitHub](https://github.com/gitkb/gh-config-cli/issues).
 
 ## How do I contribute?
 
