@@ -37,7 +37,7 @@ jobs:
           curl --silent --location https://raw.githubusercontent.com/houseabsolute/ubi/master/bootstrap/bootstrap-ubi.sh | sh
       - name: Install gh-config
         run: |
-          "$HOME/bin/ubi" --project harmony-labs/gh-config-cli --exe gh-config --in "$HOME/bin"
+          "$HOME/bin/ubi" --project gitkb/gh-config-cli --exe gh-config --in "$HOME/bin"
       - name: Validate Config (Dry Run)
         env:
           GITHUB_TOKEN: ${{ secrets.GH_PAT }}
@@ -56,7 +56,7 @@ jobs:
           curl --silent --location https://raw.githubusercontent.com/houseabsolute/ubi/master/bootstrap/bootstrap-ubi.sh | sh
       - name: Install gh-config
         run: |
-          "$HOME/bin/ubi" --project harmony-labs/gh-config-cli --exe gh-config --in "$HOME/bin"
+          "$HOME/bin/ubi" --project gitkb/gh-config-cli --exe gh-config --in "$HOME/bin"
       - name: Apply Config
         env:
           GITHUB_TOKEN: ${{ secrets.GH_PAT }}
@@ -93,7 +93,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GH_PAT }}
         run: |
-          "$HOME/bin/ubi" --project harmony-labs/gh-config-cli --exe gh-config --in "$HOME/bin"
+          "$HOME/bin/ubi" --project gitkb/gh-config-cli --exe gh-config --in "$HOME/bin"
       - name: Run Diff
         id: diff
         env:

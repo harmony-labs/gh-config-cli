@@ -17,7 +17,7 @@ Thank you for your interest in contributing! We welcome issues, feature requests
    ```
 2. **Clone the repository:**
    ```bash
-   git clone https://github.com/harmony-labs/gh-config-cli.git
+   git clone https://github.com/gitkb/gh-config-cli.git
    cd gh-config-cli
    ```
 3. **Build the project:**

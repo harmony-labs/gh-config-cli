@@ -2,8 +2,8 @@
 name = "gh-config"
 version = "0.0.0-dev"
 edition = "2021"
-repository = "https://github.com/harmony-labs/gh-config-cli"
-homepage = "https://github.com/harmony-labs/gh-config-cli"
+repository = "https://github.com/gitkb/gh-config-cli"
+homepage = "https://github.com/gitkb/gh-config-cli"
 documentation = "https://docs.rs/gh-config"
 keywords = ["cli", "context", "ai", "rust", "project", "tool"]
 authors = ["@mateodelnorte"]

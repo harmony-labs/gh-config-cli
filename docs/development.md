@@ -12,7 +12,7 @@ This guide will help you set up a local development environment for gh-config, b
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/harmony-labs/gh-config-cli.git
+   git clone https://github.com/gitkb/gh-config-cli.git
    cd gh-config-cli
    ```
 
