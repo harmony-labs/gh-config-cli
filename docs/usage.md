@@ -32,7 +32,7 @@ You can provide your GitHub Personal Access Token (PAT) in two ways:
 The configuration file is written in YAML and describes your organization, repositories, teams, users, assignments, and default settings. Below is the schema with all top-level keys and their meanings.
 
 ```yaml
-org: harmony-labs                # (string) Name of the GitHub organization
+org: gitkb                # (string) Name of the GitHub organization
 
 repos:                            # (list) Repository configurations
   - name: my-repo                 # (string) Repository name
@@ -137,9 +137,9 @@ GITHUB_TOKEN=<your-pat> gh-config sync config.yaml --dry-run
 Export your current GitHub org state into a config file.
 
 ```bash
-gh-config --token <your-pat> sync-from-org config.yaml --org harmony-labs
+gh-config --token <your-pat> sync-from-org config.yaml --org gitkb
 # or
-GITHUB_TOKEN=<your-pat> gh-config sync-from-org config.yaml --org harmony-labs
+GITHUB_TOKEN=<your-pat> gh-config sync-from-org config.yaml --org gitkb
 ```
 
 ---
