@@ -1,5 +1,5 @@
 CONFIG_FILE ?= config.yaml
-GITHUB_ORG ?= harmony-labs
+GITHUB_ORG ?= gitkb
 GITHUB_TOKEN ?=
 RUST_LOG ?= info
 

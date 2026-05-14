@@ -115,7 +115,7 @@ gh-config --token <your-pat> sync config.yaml --dry-run
 - **Generate config from org:**
 
 ```bash
-gh-config --token <your-pat> sync-from-org config.yaml --org harmony-labs
+gh-config --token <your-pat> sync-from-org config.yaml --org gitkb
 ```
 
 ### Example diff output
@@ -133,7 +133,7 @@ gh-config uses a fully extensible, declarative YAML schema. You can specify any 
 
 **Example `config.yaml`:**
 ```yaml
-org: harmony-labs
+org: gitkb
 repos:
   - name: harmony
     settings:
@@ -261,7 +261,7 @@ cargo build --release
 make build
 make diff CONFIG_FILE=config.yaml
 make sync CONFIG_FILE=config.yaml
-make sync-from-github CONFIG_FILE=config.yaml GITHUB_ORG=harmony-labs
+make sync-from-github CONFIG_FILE=config.yaml GITHUB_ORG=gitkb
 ```
 
 ---
