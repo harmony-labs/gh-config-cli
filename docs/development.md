@@ -45,7 +45,7 @@ The Makefile provides shortcuts for common tasks:
 make build
 make diff CONFIG_FILE=config.yaml
 make sync CONFIG_FILE=config.yaml
-make sync-from-github CONFIG_FILE=config.yaml GITHUB_ORG=harmony-labs
+make sync-from-github CONFIG_FILE=config.yaml GITHUB_ORG=gitkb
 ```
 
 ## Running the CLI

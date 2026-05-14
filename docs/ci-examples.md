@@ -125,7 +125,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GH_PAT }}
           RUST_LOG: info
         run: |
-          $HOME/bin/gh-config sync-from-org config.yaml --org harmony-labs
+          $HOME/bin/gh-config sync-from-org config.yaml --org gitkb
       - name: Create PR
         if: env.EXIT_CODE == 1
         uses: peter-evans/create-pull-request@v7
